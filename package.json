@@ -1,0 +1,31 @@
+{
+  "name": "raghav-chicken-machine-rubber",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:setup": "node --env-file=.env scripts/setup-db.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "latest",
+    "@sveltejs/kit": "latest",
+    "@sveltejs/vite-plugin-svelte": "latest",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "prettier": "latest",
+    "prettier-plugin-svelte": "latest",
+    "svelte": "latest",
+    "svelte-check": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "dependencies": {
+    "pg": "latest"
+  }
+}
