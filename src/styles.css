@@ -155,21 +155,23 @@ p {
   position: relative;
   isolation: isolate;
   display: grid;
-  height: clamp(620px, calc(100svh - 104px), 860px);
-  min-height: 0;
+  min-height: calc(100svh - 104px);
   max-width: none;
   padding: 0;
   overflow: hidden;
-  background: var(--black);
+  background: #1a1a1a;
+}
+.hero-copy,
+.hero-visual {
+  grid-area: 1 / 1;
 }
 .hero-copy {
-  position: relative;
   z-index: 2;
   display: flex;
   align-self: end;
   flex-direction: column;
   align-items: flex-start;
-  padding: 36px 20px 88px;
+  padding: 42px 20px 112px;
   color: var(--white);
 }
 .hero-copy::before {
@@ -178,9 +180,9 @@ p {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0) 22%,
-    rgba(0, 0, 0, 0.66) 48%,
-    rgba(0, 0, 0, 0.98) 88%
+    rgba(0, 0, 0, 0.05) 24%,
+    rgba(0, 0, 0, 0.72) 52%,
+    rgba(0, 0, 0, 0.97) 100%
   );
   content: '';
 }
@@ -202,7 +204,7 @@ p {
   max-width: 760px;
   margin: 14px 0 17px;
   color: var(--white);
-  font-size: clamp(2.7rem, 13vw, 3.2rem);
+  font-size: 3.05rem;
   font-weight: 400;
   line-height: 0.86;
   letter-spacing: -0.07em;
@@ -265,35 +267,28 @@ p {
 .trust-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px 12px;
-  margin-top: 18px;
+  gap: 8px 20px;
+  margin-top: 22px;
   color: #e9e9e9;
   font-size: 0.65rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .trust-row span:not(:last-child)::after {
-  margin-left: 12px;
+  margin-left: 20px;
   content: '—';
 }
 .hero-visual {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  min-height: 0;
+  min-height: inherit;
 }
 .poster-wrap {
-  position: absolute;
-  inset: 12px 0 auto;
-  display: grid;
-  height: min(100vw, 440px);
-  place-items: start center;
+  width: 100%;
+  height: 100%;
 }
 .poster-wrap img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center top;
+  object-fit: cover;
   filter: grayscale(1) contrast(1.06);
 }
 .floating-note {
@@ -843,20 +838,10 @@ footer a {
     justify-self: end;
   }
   .hero-copy {
-    width: 100%;
-    padding: 64px max(28px, calc((100vw - 1400px) / 2)) 84px;
+    padding: 64px max(28px, calc((100vw - 1400px) / 2)) 80px;
   }
   .hero h1 {
     font-size: clamp(4.5rem, 10vw, 8rem);
-  }
-  .poster-wrap {
-    inset: 20px 0;
-    height: auto;
-    place-items: center;
-  }
-  .poster-wrap img {
-    width: min(82vw, 900px);
-    height: min(82vw, 900px);
   }
   .hero-actions {
     gap: 10px;
@@ -904,19 +889,7 @@ footer a {
     padding-bottom: 118px;
   }
   .hero.section {
-    height: clamp(680px, calc(100svh - 104px), 860px);
-  }
-  .hero h1 {
-    max-width: 640px;
-    font-size: clamp(4.2rem, 6.2vw, 6.5rem);
-  }
-  .poster-wrap {
-    place-items: center end;
-    padding-right: max(40px, calc((100vw - 1400px) / 2));
-  }
-  .poster-wrap img {
-    width: min(64vw, 760px);
-    height: min(64vw, 760px);
+    min-height: calc(100svh - 104px);
   }
   .hero-copy {
     padding-bottom: 75px;
