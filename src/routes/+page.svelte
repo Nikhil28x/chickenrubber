@@ -97,35 +97,43 @@
   />
 </svelte:head>
 
+<div class="announcement">
+  <span>Cash on delivery across India</span>
+  <a href={`tel:${data.settings.phone}`}>{data.settings.phone}</a>
+</div>
 <header class="topbar">
   <a class="brand" href="#home" aria-label="Raghav home">
-    <span class="brand-mark">R</span>
-    <span><strong>Raghav</strong><small>Since 2004</small></span>
+    <strong>RAGHAV</strong><small>Chicken Machine Rubber</small>
   </a>
-  <a class="call-mini" href={`tel:${data.settings.phone}`} aria-label="Call Raghav">Call now</a>
+  <nav class="desktop-nav" aria-label="Main navigation">
+    <a href="#products">Products</a>
+    <a href="#demo">Watch</a>
+    <a href="#order">How to order</a>
+  </nav>
+  <a class="call-mini" href={`tel:${data.settings.phone}`} aria-label="Call Raghav">Call</a>
 </header>
 
 <main>
   <section class="hero section" id="home">
     <div class="hero-copy">
-      <div class="eyebrow"><span></span> Cash on delivery all over India</div>
-      <h1>Strong rubber.<br /><em>Smooth work.</em></h1>
-      <p>Reliable chicken machine rubber from a family business serving customers since 2004.</p>
+      <div class="eyebrow">Raghav · Since 2004</div>
+      <h1>Built for<br />the work.</h1>
+      <p>Chicken machine rubber, shown clearly and delivered simply.</p>
       <div class="hero-actions">
-        <a class="button primary" href="#products">See 4 products</a>
+        <a class="button primary" href="#products">Shop all four</a>
         <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer">
-          <span aria-hidden="true">✆</span> WhatsApp
+          WhatsApp us
         </a>
       </div>
       <div class="trust-row" aria-label="Service benefits">
-        <span>✓ Easy ordering</span><span>✓ COD available</span><span>✓ India delivery</span>
+        <span>COD available</span><span>Delivery across India</span><span>Direct support</span>
       </div>
     </div>
     <div class="hero-visual">
       <div class="poster-wrap">
         <img src={data.settings.hero_image_url} alt="Raghav Chicken Machine Rubber poster" />
       </div>
-      <div class="floating-note"><strong>20+</strong><span>Years serving India</span></div>
+      <div class="floating-note"><strong>Since</strong><span>2004</span></div>
     </div>
   </section>
 
@@ -133,10 +141,10 @@
     <div class="section-heading">
       <div>
         <span class="section-number">01</span>
-        <p class="eyebrow-text">Choose your rubber</p>
+        <p class="eyebrow-text">The essentials</p>
       </div>
-      <h2>Four simple choices.</h2>
-      <p>Tap + to choose quantity. You can confirm everything before placing your order.</p>
+      <h2>Choose what you need.</h2>
+      <p>Four products. Clear pictures. Tap + to choose your quantity.</p>
     </div>
 
     <div class="product-grid">
@@ -148,8 +156,8 @@
               alt={product.name}
               loading={index > 1 ? 'lazy' : 'eager'}
             />
-            {#if product.stock > 0}<span class="stock">In stock</span>{:else}<span class="stock out"
-                >Out of stock</span
+            {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
+                class="stock out">Out of stock</span
               >{/if}
           </div>
           <div class="product-info">
@@ -183,23 +191,23 @@
     <div class="section-heading light">
       <div>
         <span class="section-number">02</span>
-        <p class="eyebrow-text">See the product</p>
+        <p class="eyebrow-text">See every detail</p>
       </div>
-      <h2>Watch before you buy.</h2>
-      <p>See the rubber closely and check its flexibility on your phone.</p>
+      <h2>Know what arrives.</h2>
+      <p>Short, clear videos made for your phone.</p>
     </div>
     <div class="video-grid">
       <article>
         <video controls playsinline preload="metadata" src={data.settings.video_1_url}>
           <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
         </video>
-        <div><span>Product demo</span><strong>Soft rubber & washer</strong></div>
+        <div><span>Product film 01</span><strong>Rubber and washer</strong></div>
       </article>
       <article>
         <video controls playsinline preload="metadata" src={data.settings.video_2_url}>
           <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
         </video>
-        <div><span>Close-up</span><strong>Size & flexibility</strong></div>
+        <div><span>Product film 02</span><strong>Close-up and flexibility</strong></div>
       </article>
     </div>
   </section>
@@ -208,9 +216,9 @@
     <div class="section-heading">
       <div>
         <span class="section-number">03</span>
-        <p class="eyebrow-text">Order your way</p>
+        <p class="eyebrow-text">Choose your way</p>
       </div>
-      <h2>Three easy options.</h2>
+      <h2>Order in a few taps.</h2>
     </div>
     <div class="order-options">
       <a href={`tel:${data.settings.phone}`}>
@@ -383,9 +391,9 @@
   <section class="contact-section section" id="contact">
     <div class="contact-card">
       <div>
-        <p class="eyebrow-text">Need help?</p>
-        <h2>Speak directly with Raghav.</h2>
-        <p>Call or WhatsApp for product questions, price and delivery help.</p>
+        <p class="eyebrow-text">Direct support</p>
+        <h2>Questions? Ask Raghav.</h2>
+        <p>Call or WhatsApp for product, price and delivery help.</p>
       </div>
       <div class="contact-actions">
         <a class="button light-button" href={`tel:${data.settings.phone}`}

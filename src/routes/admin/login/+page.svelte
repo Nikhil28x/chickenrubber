@@ -47,7 +47,7 @@
     place-items: center;
     padding: 24px;
     background:
-      radial-gradient(circle at top right, rgba(71, 143, 244, 0.2), transparent 34%), #071d40;
+      radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 34%), #0a0a0a;
   }
   .login-card {
     width: min(100%, 440px);

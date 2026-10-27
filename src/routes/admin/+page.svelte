@@ -342,7 +342,7 @@
 
 <style>
   :global(body) {
-    background: #f1f5fa;
+    background: #f4f4f2;
   }
   .admin-topbar {
     position: sticky;
@@ -354,7 +354,7 @@
     justify-content: space-between;
     gap: 16px;
     padding: 11px max(18px, calc((100vw - 1220px) / 2));
-    border-bottom: 1px solid #dfe7f1;
+    border-bottom: 1px solid #d8d8d5;
     background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(16px);
   }
@@ -371,7 +371,7 @@
   .admin-topbar form button {
     border: 0;
     background: transparent;
-    color: #65758a;
+    color: #666;
     font-size: 0.78rem;
     cursor: pointer;
   }
@@ -404,7 +404,7 @@
     display: grid;
     gap: 7px;
     padding: 15px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 15px;
     background: white;
   }
@@ -426,12 +426,12 @@
     font-weight: 750;
   }
   .admin-notice.success {
-    background: #dff7eb;
-    color: #087949;
+    background: #e7e7e5;
+    color: #111;
   }
   .admin-notice.error {
-    background: #ffe8e8;
-    color: #a72f2f;
+    background: #d0d0cd;
+    color: #111;
   }
   .admin-tabs {
     display: flex;
@@ -439,7 +439,7 @@
     overflow-x: auto;
     margin-bottom: 14px;
     padding: 5px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 15px;
     background: white;
     scrollbar-width: none;
@@ -454,7 +454,7 @@
     border: 0;
     border-radius: 11px;
     background: transparent;
-    color: #5a6a80;
+    color: #555;
     font-size: 0.82rem;
     font-weight: 800;
     cursor: pointer;
@@ -474,7 +474,7 @@
   }
   .admin-panel {
     padding: 22px 16px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 21px;
     background: white;
   }
@@ -499,9 +499,9 @@
   }
   .order-card {
     padding: 16px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 16px;
-    background: #fbfcfe;
+    background: #fafafa;
   }
   .order-card-head {
     display: flex;
@@ -528,30 +528,30 @@
     height: fit-content;
     padding: 6px 9px;
     border-radius: 999px;
-    background: #e8eef6;
-    color: #57687d;
+    background: #e5e5e3;
+    color: #333;
     font-size: 0.62rem;
     text-transform: uppercase;
   }
   .status.confirmed {
-    background: #e7f1ff;
-    color: #0757c9;
+    background: #ededeb;
+    color: #111;
   }
   .status.processing {
-    background: #fff3d1;
-    color: #8b6700;
+    background: #dededb;
+    color: #111;
   }
   .status.shipped {
-    background: #ece7ff;
-    color: #6044bd;
+    background: #d2d2cf;
+    color: #111;
   }
   .status.delivered {
-    background: #e1f7ec;
-    color: #087949;
+    background: #c5c5c1;
+    color: #111;
   }
   .status.cancelled {
-    background: #ffe8e8;
-    color: #a72f2f;
+    background: #b9b9b5;
+    color: #111;
   }
   .order-details {
     display: grid;
@@ -585,7 +585,7 @@
   }
   .order-address p {
     margin: 5px 0 0;
-    color: #405168;
+    color: #444;
     font-size: 0.78rem;
     line-height: 1.45;
   }
@@ -617,7 +617,7 @@
     text-align: center;
   }
   .empty-state > span {
-    color: #a9b8ca;
+    color: #aaa;
     font-size: 3rem;
   }
   .empty-state h3 {
@@ -635,15 +635,15 @@
     display: grid;
     gap: 13px;
     padding: 14px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 16px;
-    background: #fbfcfe;
+    background: #fafafa;
   }
   .edit-product-image {
     overflow: hidden;
     aspect-ratio: 1;
     border-radius: 13px;
-    background: #eef2f7;
+    background: #eee;
   }
   .edit-product-image img {
     width: 100%;
@@ -656,7 +656,7 @@
     min-height: 44px;
     place-items: center;
     overflow: hidden;
-    border: 1px dashed #9eb5d4;
+    border: 1px dashed #888;
     border-radius: 11px;
     background: var(--sky);
     color: var(--blue);
@@ -683,7 +683,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #43556c;
+    color: #444;
     font-size: 0.76rem;
     font-weight: 750;
   }
@@ -698,9 +698,9 @@
   }
   .settings-block {
     padding: 18px;
-    border: 1px solid #dce5f0;
+    border: 1px solid #d8d8d5;
     border-radius: 16px;
-    background: #fbfcfe;
+    background: #fafafa;
   }
   .settings-block h3 {
     margin: 0 0 16px;
