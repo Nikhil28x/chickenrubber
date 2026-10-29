@@ -510,5 +510,11 @@
 <nav class="mobile-dock" aria-label="Quick actions">
   <a href={`tel:${data.settings.phone}`}><span>☎</span>Call</a>
   <a href={whatsappHref} target="_blank" rel="noreferrer"><span>◉</span>WhatsApp</a>
-  <button type="button" onclick={startOrder}><span>↗</span>Order</button>
+  <button
+    type="button"
+    onclick={() => {
+      closeProduct();
+      startOrder();
+    }}><span>↗</span>Order</button
+  >
 </nav>

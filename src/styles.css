@@ -521,7 +521,7 @@ p {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 12px;
+  padding: 12px 12px calc(76px + env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.82);
   backdrop-filter: blur(8px);
 }
@@ -537,7 +537,7 @@ p {
   z-index: 1;
   display: grid;
   width: min(100%, 1120px);
-  max-height: calc(100svh - 24px);
+  max-height: calc(100svh - 100px - env(safe-area-inset-bottom));
   grid-template-columns: 62px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
@@ -957,7 +957,7 @@ footer a {
 
 .mobile-dock {
   position: fixed;
-  z-index: 100;
+  z-index: 400;
   right: 10px;
   bottom: max(10px, env(safe-area-inset-bottom));
   left: 10px;
