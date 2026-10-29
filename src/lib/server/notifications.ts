@@ -19,8 +19,8 @@ function message(order: NotificationOrder) {
 }
 
 async function sendTwilio(to: string, from: string, body: string) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
+  const sid = TWILIO_ACCOUNT_SID;
+  const token = TWILIO_AUTH_TOKEN;
   if (!sid || !token || !from) return 'not_configured';
 
   const form = new URLSearchParams({ To: to, From: from, Body: body });
@@ -50,7 +50,7 @@ export async function notifyOwner(
   try {
     results.whatsapp = await sendTwilio(
       `whatsapp:+91${owner.whatsapp.replace(/\D/g, '').slice(-10)}`,
-      process.env.TWILIO_WHATSAPP_FROM || '',
+      TWILIO_WHATSAPP_FROM || '',
       body
     );
   } catch {
@@ -60,23 +60,23 @@ export async function notifyOwner(
   try {
     results.sms = await sendTwilio(
       `+91${owner.phone.replace(/\D/g, '').slice(-10)}`,
-      process.env.TWILIO_SMS_FROM || '',
+      TWILIO_SMS_FROM || '',
       body
     );
   } catch {
     results.sms = 'failed';
   }
 
-  if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
+  if (RESEND_API_KEY && EMAIL_FROM) {
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          Authorization: `Bearer ${RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM,
+          from: EMAIL_FROM,
           to: owner.email,
           subject: `New order #${order.orderNumber}`,
           text: body
@@ -88,9 +88,9 @@ export async function notifyOwner(
     }
   }
 
-  if (process.env.ORDER_WEBHOOK_URL) {
+  if (ORDER_WEBHOOK_URL) {
     try {
-      const response = await fetch(process.env.ORDER_WEBHOOK_URL, {
+      const response = await fetch(ORDER_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...order, message: body })
@@ -103,3 +103,12 @@ export async function notifyOwner(
 
   return results;
 }
+import {
+  EMAIL_FROM,
+  ORDER_WEBHOOK_URL,
+  RESEND_API_KEY,
+  TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN,
+  TWILIO_SMS_FROM,
+  TWILIO_WHATSAPP_FROM
+} from '$app/env/private';

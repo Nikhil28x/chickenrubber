@@ -1,13 +1,16 @@
 <script lang="ts">
+  import type { Product } from '../lib/types';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
 
-  let quantities = $state<Record<number, number>>({});
   let checkoutOpen = $state(false);
   let submitting = $state(false);
   let errorMessage = $state('');
   let orderNumber = $state('');
+  let activeProduct = $state<Product | null>(null);
+  let activeMediaIndex = $state(0);
+  let selectedProductId = $state(0);
 
   let form = $state({
     customer_name: '',
@@ -24,27 +27,62 @@
     payment_method: 'cod'
   });
 
-  const selectedItems = $derived.by(() =>
-    data.products
-      .filter((product) => (quantities[product.id] || 0) > 0)
-      .map((product) => ({ ...product, quantity: quantities[product.id] }))
-  );
-  const itemCount = $derived(selectedItems.reduce((sum, item) => sum + item.quantity, 0));
+  const selectedItems = $derived.by(() => {
+    const product = data.products.find((item) => item.id === Number(selectedProductId));
+    return product && product.stock > 0 ? [{ ...product, quantity: 1 }] : [];
+  });
   const total = $derived(selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0));
   const whatsappNumber = $derived(data.settings.whatsapp.replace(/\D/g, '').slice(-10));
   const whatsappHref = $derived(
     `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent('Hello Raghav, I want to know about chicken machine rubber.')}`
   );
 
-  function changeQuantity(productId: number, change: number, max: number) {
-    quantities[productId] = Math.max(0, Math.min(max, (quantities[productId] || 0) + change));
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = activeProduct ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  });
+
+  $effect(() => {
+    const selectionIsAvailable = data.products.some(
+      (product) => product.id === Number(selectedProductId) && product.stock > 0
+    );
+    if (!selectionIsAvailable) {
+      selectedProductId =
+        data.products.find((product) => product.stock > 0)?.id ?? data.products[0]?.id ?? 0;
+    }
+  });
+
+  function productMedia(product: Product) {
+    return [
+      { type: 'image' as const, src: product.image_url, label: 'Photo 1' },
+      { type: 'image' as const, src: product.image_2_url || product.image_url, label: 'Photo 2' },
+      { type: 'image' as const, src: product.image_3_url || product.image_url, label: 'Photo 3' },
+      {
+        type: 'video' as const,
+        src: product.product_video_url || data.settings.video_1_url,
+        label: 'Video'
+      }
+    ];
+  }
+
+  function openProduct(product: Product) {
+    activeProduct = product;
+    activeMediaIndex = 0;
+  }
+
+  function closeProduct() {
+    activeProduct = null;
+    activeMediaIndex = 0;
+  }
+
+  function handleGalleryKey(event: KeyboardEvent) {
+    if (event.key === 'Escape' && activeProduct) closeProduct();
   }
 
   function startOrder() {
-    if (!itemCount) {
-      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
     checkoutOpen = true;
     setTimeout(
       () => document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' }),
@@ -89,6 +127,8 @@
   }
 </script>
 
+<svelte:window onkeydown={handleGalleryKey} />
+
 <svelte:head>
   <title>Raghav Chicken Machine Rubber | Since 2004</title>
   <meta
@@ -119,14 +159,10 @@
       <div class="eyebrow">Raghav · Since 2004</div>
       <h1>Built for<br />the work.</h1>
       <p>Chicken machine rubber, shown clearly and delivered simply.</p>
-      <div class="hero-actions">
-        <a class="button primary" href="#products">Shop all four</a>
-        <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer">
-          WhatsApp us
-        </a>
-      </div>
-      <div class="trust-row" aria-label="Service benefits">
-        <span>COD available</span><span>Delivery across India</span><span>Direct support</span>
+      <div class="hero-services" aria-label="Service benefits">
+        <div class="cod-pulse"><strong>Cash on delivery</strong><span>Pay on arrival</span></div>
+        <div><strong>Delivery across India</strong><span>Doorstep service</span></div>
+        <div><strong>Direct support</strong><span>Call for help</span></div>
       </div>
     </div>
     <div class="hero-visual">
@@ -138,19 +174,15 @@
   </section>
 
   <section class="products-section section" id="products">
-    <div class="section-heading">
-      <div>
-        <span class="section-number">01</span>
-        <p class="eyebrow-text">The essentials</p>
-      </div>
-      <h2>Choose what you need.</h2>
-      <p>Four products. Clear pictures. Tap + to choose your quantity.</p>
-    </div>
-
     <div class="product-grid">
       {#each data.products as product, index}
         <article class="product-card">
-          <div class="product-image">
+          <button
+            class="product-image product-media-button"
+            type="button"
+            onclick={() => openProduct(product)}
+            aria-label={`Open photos and video for ${product.name}`}
+          >
             <img
               src={product.image_url}
               alt={product.name}
@@ -159,26 +191,18 @@
             {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
                 class="stock out">Out of stock</span
               >{/if}
-          </div>
+            <span class="view-media" aria-hidden="true">View 3 photos + video</span>
+          </button>
           <div class="product-info">
-            <span class="product-count">0{index + 1}</span>
-            <h3>{product.name}</h3>
-            <p>{product.description}</p>
             <div class="product-bottom">
-              <strong>{product.price > 0 ? money(product.price) : 'Ask price'}</strong>
-              <div class="stepper" aria-label={`Quantity for ${product.name}`}>
-                <button
-                  type="button"
-                  onclick={() => changeQuantity(product.id, -1, product.stock)}
-                  aria-label="Remove one">−</button
+              <div class="price-block">
+                <span>Price</span><strong
+                  >{product.price > 0 ? money(product.price) : 'Ask price'}</strong
                 >
-                <span>{quantities[product.id] || 0}</span>
-                <button
-                  type="button"
-                  onclick={() => changeQuantity(product.id, 1, product.stock)}
-                  aria-label="Add one"
-                  disabled={product.stock < 1}>+</button
-                >
+              </div>
+              <div class="quantity-block">
+                <span>Quantity</span>
+                <strong>{product.stock}</strong>
               </div>
             </div>
           </div>
@@ -270,6 +294,17 @@
                 aria-label="Close form">×</button
               >
             </div>
+
+            <label class="checkout-product">
+              <span>Choose product *</span>
+              <select bind:value={selectedProductId} required>
+                {#each data.products as product}
+                  <option value={product.id} disabled={product.stock < 1}>
+                    {product.name} · {product.price > 0 ? money(product.price) : 'Ask price'}
+                  </option>
+                {/each}
+              </select>
+            </label>
 
             <div class="order-summary">
               {#each selectedItems as item}
@@ -415,10 +450,65 @@
   </section>
 </main>
 
+{#if activeProduct}
+  {@const viewedProduct = activeProduct}
+  {@const media = productMedia(viewedProduct)}
+  {@const selectedMedia = media[activeMediaIndex]}
+  <div class="product-viewer" role="presentation">
+    <button class="viewer-backdrop" type="button" onclick={closeProduct} aria-label="Close gallery"
+    ></button>
+    <div
+      class="viewer-shell"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${viewedProduct.name} media gallery`}
+    >
+      <button class="viewer-close" type="button" onclick={closeProduct} aria-label="Close gallery"
+        >×</button
+      >
+      <div class="viewer-thumbnails" aria-label="Choose media">
+        {#each media as item, mediaIndex}
+          <button
+            type="button"
+            class:active={activeMediaIndex === mediaIndex}
+            onclick={() => (activeMediaIndex = mediaIndex)}
+            aria-label={item.label}
+          >
+            {#if item.type === 'image'}
+              <img src={item.src} alt="" />
+            {:else}
+              <video src={item.src} muted playsinline preload="metadata"></video>
+              <span class="play-mark">▶</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+      <div class="viewer-stage">
+        {#if selectedMedia.type === 'image'}
+          <img src={selectedMedia.src} alt={viewedProduct.name} />
+        {:else}
+          <video src={selectedMedia.src} controls autoplay playsinline preload="metadata">
+            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
+          </video>
+        {/if}
+      </div>
+      <div class="viewer-purchase">
+        <div>
+          <span>Price</span><strong
+            >{viewedProduct.price > 0 ? money(viewedProduct.price) : 'Ask price'}</strong
+          >
+        </div>
+        <div class="quantity-block">
+          <span>Quantity</span>
+          <strong>{viewedProduct.stock}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <nav class="mobile-dock" aria-label="Quick actions">
   <a href={`tel:${data.settings.phone}`}><span>☎</span>Call</a>
   <a href={whatsappHref} target="_blank" rel="noreferrer"><span>◉</span>WhatsApp</a>
-  <button type="button" onclick={startOrder} class:has-items={itemCount > 0}>
-    <span>{itemCount || '↗'}</span>{itemCount ? 'Order now' : 'Order'}
-  </button>
+  <button type="button" onclick={startOrder}><span>↗</span>Order</button>
 </nav>

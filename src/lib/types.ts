@@ -5,6 +5,9 @@ export type Product = {
   price: number;
   stock: number;
   image_url: string;
+  image_2_url: string;
+  image_3_url: string;
+  product_video_url: string;
   is_active: boolean;
   sort_order: number;
 };

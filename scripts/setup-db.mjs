@@ -57,6 +57,22 @@ await pool.query(`
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS image_2_url TEXT NOT NULL DEFAULT '';
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS image_3_url TEXT NOT NULL DEFAULT '';
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS product_video_url TEXT NOT NULL DEFAULT '';
+`);
+
+await pool.query(`
+  UPDATE products SET
+    image_2_url = CASE ((sort_order - 1) % 4) + 1
+      WHEN 1 THEN '/products/rubber-2.jpg' WHEN 2 THEN '/products/rubber-3.jpg'
+      WHEN 3 THEN '/products/rubber-4.jpg' ELSE '/products/rubber-1.jpg' END,
+    image_3_url = CASE ((sort_order - 1) % 4) + 1
+      WHEN 1 THEN '/products/rubber-3.jpg' WHEN 2 THEN '/products/rubber-4.jpg'
+      WHEN 3 THEN '/products/rubber-1.jpg' ELSE '/products/rubber-2.jpg' END,
+    product_video_url = CASE WHEN sort_order % 2 = 0
+      THEN '/media/product-demo-2.mp4' ELSE '/media/product-demo-1.mp4' END
+  WHERE image_2_url = '' OR image_3_url = '' OR product_video_url = ''
 `);
 
 await pool.query(

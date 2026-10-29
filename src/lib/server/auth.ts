@@ -1,4 +1,10 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  ADMIN_PASSWORD,
+  ADMIN_SESSION_SECRET,
+  ADMIN_USERNAME,
+  DATABASE_URL
+} from '$app/env/private';
 
 const DEFAULT_PASSWORD_HASH = 'ff7bd97b1a7789ddd2775122fd6817f3173672da9f802ceec57f284325bf589f';
 
@@ -13,13 +19,13 @@ function passwordHash(password: string) {
 }
 
 function secret() {
-  return process.env.ADMIN_SESSION_SECRET || `${process.env.DATABASE_URL || 'raghav'}-session-v1`;
+  return ADMIN_SESSION_SECRET || `${DATABASE_URL || 'raghav'}-session-v1`;
 }
 
 export function verifyAdmin(username: string, password: string) {
-  const expectedUser = process.env.ADMIN_USERNAME || 'admin';
-  const expectedPasswordHash = process.env.ADMIN_PASSWORD
-    ? passwordHash(process.env.ADMIN_PASSWORD)
+  const expectedUser = ADMIN_USERNAME || 'admin';
+  const expectedPasswordHash = ADMIN_PASSWORD
+    ? passwordHash(ADMIN_PASSWORD)
     : DEFAULT_PASSWORD_HASH;
 
   return (

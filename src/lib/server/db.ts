@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { DATABASE_URL } from '$app/env/private';
 import type { Product, SiteSettings } from '../types';
 
 const { Pool } = pg;
@@ -27,6 +28,9 @@ export const defaultProducts: Product[] = [
     price: 0,
     stock: 100,
     image_url: '/products/rubber-1.jpg',
+    image_2_url: '/products/rubber-2.jpg',
+    image_3_url: '/products/rubber-3.jpg',
+    product_video_url: '/media/product-demo-1.mp4',
     is_active: true,
     sort_order: 1
   },
@@ -37,6 +41,9 @@ export const defaultProducts: Product[] = [
     price: 0,
     stock: 100,
     image_url: '/products/rubber-2.jpg',
+    image_2_url: '/products/rubber-3.jpg',
+    image_3_url: '/products/rubber-4.jpg',
+    product_video_url: '/media/product-demo-2.mp4',
     is_active: true,
     sort_order: 2
   },
@@ -47,6 +54,9 @@ export const defaultProducts: Product[] = [
     price: 0,
     stock: 100,
     image_url: '/products/rubber-3.jpg',
+    image_2_url: '/products/rubber-4.jpg',
+    image_3_url: '/products/rubber-1.jpg',
+    product_video_url: '/media/product-demo-1.mp4',
     is_active: true,
     sort_order: 3
   },
@@ -57,16 +67,19 @@ export const defaultProducts: Product[] = [
     price: 0,
     stock: 100,
     image_url: '/products/rubber-4.jpg',
+    image_2_url: '/products/rubber-1.jpg',
+    image_3_url: '/products/rubber-2.jpg',
+    product_video_url: '/media/product-demo-2.mp4',
     is_active: true,
     sort_order: 4
   }
 ];
 
 function getPool() {
-  if (!process.env.DATABASE_URL) return undefined;
+  if (!DATABASE_URL) return undefined;
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 5
     });
@@ -128,6 +141,29 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS image_2_url TEXT NOT NULL DEFAULT '';
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS image_3_url TEXT NOT NULL DEFAULT '';
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS product_video_url TEXT NOT NULL DEFAULT '';
+  `);
+
+  await db.query(`
+    UPDATE products SET
+      image_2_url = CASE ((sort_order - 1) % 4) + 1
+        WHEN 1 THEN '/products/rubber-2.jpg'
+        WHEN 2 THEN '/products/rubber-3.jpg'
+        WHEN 3 THEN '/products/rubber-4.jpg'
+        ELSE '/products/rubber-1.jpg'
+      END,
+      image_3_url = CASE ((sort_order - 1) % 4) + 1
+        WHEN 1 THEN '/products/rubber-3.jpg'
+        WHEN 2 THEN '/products/rubber-4.jpg'
+        WHEN 3 THEN '/products/rubber-1.jpg'
+        ELSE '/products/rubber-2.jpg'
+      END,
+      product_video_url = CASE WHEN sort_order % 2 = 0
+        THEN '/media/product-demo-2.mp4' ELSE '/media/product-demo-1.mp4' END
+    WHERE image_2_url = '' OR image_3_url = '' OR product_video_url = ''
   `);
 
   await db.query(
@@ -154,14 +190,18 @@ export async function initDb() {
   if (Number(count.rows[0]?.count) === 0) {
     for (const product of defaultProducts) {
       await db.query(
-        `INSERT INTO products (name, description, price, stock, image_url, is_active, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO products (name, description, price, stock, image_url, image_2_url, image_3_url,
+         product_video_url, is_active, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           product.name,
           product.description,
           product.price,
           product.stock,
           product.image_url,
+          product.image_2_url,
+          product.image_3_url,
+          product.product_video_url,
           product.is_active,
           product.sort_order
         ]
@@ -182,7 +222,9 @@ export async function getStorefront() {
     const [settingsResult, productsResult] = await Promise.all([
       db.query<SiteSettings>('SELECT * FROM site_settings WHERE id = 1'),
       db.query<Product>(
-        'SELECT id, name, description, price::float8 AS price, stock, image_url, is_active, sort_order FROM products WHERE is_active = TRUE ORDER BY sort_order, id LIMIT 4'
+        `SELECT id, name, description, price::float8 AS price, stock, image_url, image_2_url,
+         image_3_url, product_video_url, is_active, sort_order FROM products
+         WHERE is_active = TRUE ORDER BY sort_order, id LIMIT 4`
       )
     ]);
     return {

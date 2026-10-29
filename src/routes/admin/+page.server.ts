@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { dbQuery, initDb } from '../../lib/server/db';
 import type { Actions, PageServerLoad } from './$types';
 
-const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 15 * 1024 * 1024;
 
 function field(form: FormData, name: string) {
@@ -25,7 +25,8 @@ export const load: PageServerLoad = async ({ locals }) => {
   const [settings, products, orders, counts] = await Promise.all([
     dbQuery('SELECT * FROM site_settings WHERE id = 1'),
     dbQuery(
-      'SELECT id, name, description, price::float8 AS price, stock, image_url, is_active, sort_order FROM products ORDER BY sort_order, id'
+      `SELECT id, name, description, price::float8 AS price, stock, image_url, image_2_url,
+       image_3_url, product_video_url, is_active, sort_order FROM products ORDER BY sort_order, id`
     ),
     dbQuery(
       `SELECT id, order_number::text, customer_name, mobile_primary, mobile_secondary, pincode, state,
@@ -89,15 +90,25 @@ export const actions: Actions = {
       const form = await request.formData();
       const id = Number(field(form, 'id'));
       const imageUpload = await fileToDataUrl(form.get('image_upload'), MAX_IMAGE_SIZE);
+      const image2Upload = await fileToDataUrl(form.get('image_2_upload'), MAX_IMAGE_SIZE);
+      const image3Upload = await fileToDataUrl(form.get('image_3_upload'), MAX_IMAGE_SIZE);
+      const productVideoUpload = await fileToDataUrl(
+        form.get('product_video_upload'),
+        MAX_VIDEO_SIZE
+      );
       await dbQuery(
         `UPDATE products SET name=$1, description=$2, price=$3, stock=$4, image_url=$5,
-         is_active=$6, sort_order=$7, updated_at=NOW() WHERE id=$8`,
+         image_2_url=$6, image_3_url=$7, product_video_url=$8, is_active=$9, sort_order=$10,
+         updated_at=NOW() WHERE id=$11`,
         [
           field(form, 'name'),
           field(form, 'description'),
           Math.max(0, Number(field(form, 'price')) || 0),
           Math.max(0, Number(field(form, 'stock')) || 0),
           imageUpload || field(form, 'image_url'),
+          image2Upload || field(form, 'image_2_url'),
+          image3Upload || field(form, 'image_3_url'),
+          productVideoUpload || field(form, 'product_video_url'),
           form.get('is_active') === 'on',
           Number(field(form, 'sort_order')) || 0,
           id

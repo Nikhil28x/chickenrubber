@@ -33,6 +33,35 @@
       .filter(Boolean)
       .join(', ');
   }
+
+  async function resizePhonePhoto(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !file.type.startsWith('image/') || file.size < 1_500_000) return;
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const maxSide = 1800;
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.82)
+      );
+      bitmap.close();
+      if (!blob || blob.size >= file.size) return;
+
+      const files = new DataTransfer();
+      files.items.add(
+        new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+      );
+      input.files = files.files;
+    } catch {
+      // Keep the original file if the browser cannot resize this format.
+    }
+  }
 </script>
 
 <svelte:head><title>Store admin | Raghav</title></svelte:head>
@@ -156,7 +185,7 @@
           <p class="eyebrow-text">Website section 2</p>
           <h2>Edit four products</h2>
         </div>
-        <p>Change the image, name, price and available quantity.</p>
+        <p>Set three photos, one video, price and available quantity for each product.</p>
       </div>
       <div class="admin-product-grid">
         {#each data.products as product}
@@ -167,13 +196,94 @@
             class="edit-product"
           >
             <input type="hidden" name="id" value={product.id} />
-            <div class="edit-product-image"><img src={product.image_url} alt={product.name} /></div>
-            <label class="upload-button"
-              ><input type="file" name="image_upload" accept="image/*" /><span
-                >Upload new photo</span
-              ></label
-            >
-            <input type="hidden" name="image_url" value={product.image_url} />
+            <div class="product-media-admin">
+              <div>
+                <div class="edit-product-image">
+                  <img src={product.image_url} alt={`${product.name}, angle 1`} />
+                </div>
+                <span>Photo 1 · Main</span>
+              </div>
+              <div>
+                <div class="edit-product-image">
+                  <img src={product.image_2_url} alt={`${product.name}, angle 2`} />
+                </div>
+                <span>Photo 2</span>
+              </div>
+              <div>
+                <div class="edit-product-image">
+                  <img src={product.image_3_url} alt={`${product.name}, angle 3`} />
+                </div>
+                <span>Photo 3</span>
+              </div>
+              <div>
+                <div class="edit-product-image video-preview">
+                  <video src={product.product_video_url} muted playsinline preload="metadata"
+                  ></video>
+                  <b>▶</b>
+                </div>
+                <span>Video</span>
+              </div>
+            </div>
+            <div class="media-fields">
+              <label class="admin-field"
+                ><span>Photo 1 link</span><input
+                  name="image_url"
+                  value={product.image_url}
+                  required
+                /></label
+              >
+              <label class="upload-button"
+                ><input
+                  type="file"
+                  name="image_upload"
+                  accept="image/*"
+                  onchange={resizePhonePhoto}
+                /><span>Upload photo 1</span></label
+              >
+              <label class="admin-field"
+                ><span>Photo 2 link</span><input
+                  name="image_2_url"
+                  value={product.image_2_url}
+                  required
+                /></label
+              >
+              <label class="upload-button"
+                ><input
+                  type="file"
+                  name="image_2_upload"
+                  accept="image/*"
+                  onchange={resizePhonePhoto}
+                /><span>Upload photo 2</span></label
+              >
+              <label class="admin-field"
+                ><span>Photo 3 link</span><input
+                  name="image_3_url"
+                  value={product.image_3_url}
+                  required
+                /></label
+              >
+              <label class="upload-button"
+                ><input
+                  type="file"
+                  name="image_3_upload"
+                  accept="image/*"
+                  onchange={resizePhonePhoto}
+                /><span>Upload photo 3</span></label
+              >
+              <label class="admin-field"
+                ><span>Product video link</span><input
+                  name="product_video_url"
+                  value={product.product_video_url}
+                  required
+                /></label
+              >
+              <label class="upload-button"
+                ><input type="file" name="product_video_upload" accept="video/*" /><span
+                  >Upload video (max 15 MB)</span
+                ></label
+              >
+            </div>
+            <p class="upload-help">Phone photos are resized automatically before upload.</p>
             <label class="admin-field"
               ><span>Product name</span><input name="name" value={product.name} required /></label
             >
@@ -288,8 +398,12 @@
               /></label
             >
             <label class="upload-button full"
-              ><input type="file" name="qr_upload" accept="image/*" /><span>Or upload QR image</span
-              ></label
+              ><input
+                type="file"
+                name="qr_upload"
+                accept="image/*"
+                onchange={resizePhonePhoto}
+              /><span>Or upload QR image</span></label
             >
           </div>
         </div>
@@ -304,9 +418,12 @@
               /></label
             >
             <label class="upload-button full"
-              ><input type="file" name="hero_upload" accept="image/*" /><span
-                >Upload new poster</span
-              ></label
+              ><input
+                type="file"
+                name="hero_upload"
+                accept="image/*"
+                onchange={resizePhonePhoto}
+              /><span>Upload new poster</span></label
             >
             <label class="admin-field full"
               ><span>Video 1 link</span><input
@@ -645,10 +762,52 @@
     border-radius: 13px;
     background: #eee;
   }
-  .edit-product-image img {
+  .edit-product-image img,
+  .edit-product-image video {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  .product-media-admin {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .product-media-admin > div {
+    display: grid;
+    gap: 5px;
+  }
+  .product-media-admin span {
+    color: var(--muted);
+    font-size: 0.58rem;
+    font-weight: 750;
+    text-align: center;
+  }
+  .video-preview {
+    position: relative;
+  }
+  .video-preview b {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    font-size: 0.62rem;
+    transform: translate(-50%, -50%);
+  }
+  .media-fields {
+    display: grid;
+    gap: 9px;
+  }
+  .upload-help {
+    margin: -4px 0 0;
+    color: var(--muted);
+    font-size: 0.68rem;
+    line-height: 1.4;
   }
   .upload-button {
     position: relative;
