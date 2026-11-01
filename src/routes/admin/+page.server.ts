@@ -1,5 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { dbQuery, initDb } from '../../lib/server/db';
+import { PRODUCT_COLUMNS, dbQuery, initDb } from '../../lib/server/db';
+import { insertPlaceholderProducts } from '../../lib/server/schema';
+import type { Frame, Product } from '../../lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -22,27 +24,30 @@ export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.admin) redirect(303, '/admin/login');
   await initDb();
 
-  const [settings, products, orders, counts] = await Promise.all([
+  const [settings, frames, products, orders, counts] = await Promise.all([
     dbQuery('SELECT * FROM site_settings WHERE id = 1'),
-    dbQuery(
-      `SELECT id, name, description, price::float8 AS price, stock, image_url, image_2_url,
-       image_3_url, product_video_url, is_active, sort_order FROM products ORDER BY sort_order, id`
+    dbQuery<Frame>(
+      'SELECT id, title, subtitle, is_active, sort_order FROM frames ORDER BY sort_order, id'
     ),
+    dbQuery<Product>(`SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY sort_order, id`),
     dbQuery(
       `SELECT id, order_number::text, customer_name, mobile_primary, mobile_secondary, pincode, state,
        district, city, locality, road, landmark, shop_name, payment_method, items, total::float8 AS total,
-       status, notifications, created_at FROM orders ORDER BY created_at DESC LIMIT 100`
+       message, status, notifications, created_at FROM orders ORDER BY created_at DESC LIMIT 100`
     ),
     dbQuery(
       `SELECT COUNT(*)::int AS total_orders,
        COUNT(*) FILTER (WHERE status IN ('confirmed', 'processing'))::int AS open_orders,
-       COALESCE(SUM(total), 0)::float8 AS total_value FROM orders`
+       (SELECT COUNT(*)::int FROM frames WHERE is_active) AS live_frames FROM orders`
     )
   ]);
 
   return {
     settings: settings.rows[0],
-    products: products.rows,
+    frames: frames.rows.map((frame) => ({
+      ...frame,
+      products: products.rows.filter((product) => product.frame_id === frame.id)
+    })),
     orders: orders.rows,
     stats: counts.rows[0]
   };
@@ -54,14 +59,13 @@ export const actions: Actions = {
     try {
       const form = await request.formData();
       const heroUpload = await fileToDataUrl(form.get('hero_upload'), MAX_IMAGE_SIZE);
-      const qrUpload = await fileToDataUrl(form.get('qr_upload'), MAX_IMAGE_SIZE);
       const video1Upload = await fileToDataUrl(form.get('video_1_upload'), MAX_VIDEO_SIZE);
       const video2Upload = await fileToDataUrl(form.get('video_2_upload'), MAX_VIDEO_SIZE);
 
       await dbQuery(
         `UPDATE site_settings SET
-          business_name=$1, phone=$2, secondary_phone=$3, email=$4, whatsapp=$5, upi_id=$6,
-          qr_url=$7, hero_image_url=$8, video_1_url=$9, video_2_url=$10, updated_at=NOW()
+          business_name=$1, phone=$2, secondary_phone=$3, email=$4, whatsapp=$5, address=$6,
+          hero_image_url=$7, video_1_url=$8, video_2_url=$9, updated_at=NOW()
         WHERE id=1`,
         [
           field(form, 'business_name'),
@@ -69,19 +73,60 @@ export const actions: Actions = {
           field(form, 'secondary_phone'),
           field(form, 'email'),
           field(form, 'whatsapp'),
-          field(form, 'upi_id'),
-          qrUpload || field(form, 'qr_url'),
+          field(form, 'address'),
           heroUpload || field(form, 'hero_image_url'),
           video1Upload || field(form, 'video_1_url'),
           video2Upload || field(form, 'video_2_url')
         ]
       );
-      return { success: 'Business details saved.' };
+      return { success: 'Business details saved.', tab: 'settings' as const };
     } catch (error) {
       return fail(400, {
-        error: error instanceof Error ? error.message : 'Could not save settings'
+        error: error instanceof Error ? error.message : 'Could not save settings',
+        tab: 'settings' as const
       });
     }
+  },
+
+  updateFrame: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const form = await request.formData();
+    const title = field(form, 'title');
+    if (!title) return fail(400, { error: 'Frame title is required', tab: 'products' as const });
+    const live = form.get('is_active') === 'on';
+    await dbQuery(
+      `UPDATE frames SET title=$1, subtitle=$2, is_active=$3, sort_order=$4, updated_at=NOW()
+       WHERE id=$5`,
+      [
+        title,
+        field(form, 'subtitle'),
+        live,
+        Number(field(form, 'sort_order')) || 0,
+        Number(field(form, 'id'))
+      ]
+    );
+    return {
+      success: live ? `“${title}” is live on the website.` : `“${title}” saved and hidden.`,
+      tab: 'products' as const
+    };
+  },
+
+  addFrame: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const form = await request.formData();
+    const title = field(form, 'title');
+    if (!title) return fail(400, { error: 'Give the new frame a title', tab: 'products' as const });
+    const frame = await dbQuery<{ id: number }>(
+      `INSERT INTO frames (title, subtitle, is_active, sort_order)
+       VALUES ($1, '', FALSE, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM frames))
+       RETURNING id`,
+      [title]
+    );
+    await insertPlaceholderProducts({ query: dbQuery }, frame.rows[0].id, title);
+    return {
+      success: `Frame “${title}” added with 4 product slots. Fill them in, then switch it on.`,
+      tab: 'products' as const
+    };
   },
 
   updateProduct: async ({ request, locals }) => {
@@ -114,10 +159,11 @@ export const actions: Actions = {
           id
         ]
       );
-      return { success: `Product ${id} saved.` };
+      return { success: `${field(form, 'name')} saved.`, tab: 'products' as const };
     } catch (error) {
       return fail(400, {
-        error: error instanceof Error ? error.message : 'Could not save product'
+        error: error instanceof Error ? error.message : 'Could not save product',
+        tab: 'products' as const
       });
     }
   },
@@ -128,14 +174,14 @@ export const actions: Actions = {
     const id = field(form, 'id');
     const status = field(form, 'status');
     if (!['confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
-      return fail(400, { error: 'Invalid order status' });
+      return fail(400, { error: 'Invalid status' });
     }
     await dbQuery('UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2', [status, id]);
-    return { success: 'Order status updated.' };
+    return { success: 'Request status updated.' };
   },
 
   logout: async ({ cookies }) => {
-    cookies.delete('raghav_admin', { path: '/' });
+    cookies.delete('naazare_admin', { path: '/' });
     redirect(303, '/admin/login');
   }
 };

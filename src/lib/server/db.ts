@@ -1,86 +1,68 @@
 import pg from 'pg';
 import { DATABASE_URL } from '$app/env/private';
-import type { Product, SiteSettings } from '../types';
+import type { Frame, FrameWithProducts, Product, SiteSettings } from '../types';
+import {
+  BUSINESS_NAME,
+  PRODUCTS_PER_FRAME,
+  defaultFrameSeeds,
+  defaultRubberProducts,
+  migrate
+} from './schema';
 
 const { Pool } = pg;
 
 let pool: pg.Pool | undefined;
-let initialized = false;
+let initialized: Promise<void> | undefined;
 
 export const defaultSettings: SiteSettings = {
-  business_name: 'Raghav Chicken Machine Rubber',
+  business_name: BUSINESS_NAME,
   phone: '9900281928',
   secondary_phone: '',
   email: 'mahamaaya9@gmail.com',
   whatsapp: '9900281928',
-  upi_id: '',
-  qr_url: '',
-  hero_image_url: '/media/raghav-brand-poster.png',
+  address: '',
+  hero_image_url: '',
   video_1_url: '/media/product-demo-1.mp4',
   video_2_url: '/media/product-demo-2.mp4'
 };
 
-export const defaultProducts: Product[] = [
+const defaultProducts: Product[] = defaultRubberProducts.map(
+  ([name, description, a, b, c, video], index) => ({
+    id: index + 1,
+    frame_id: 1,
+    name,
+    description,
+    price: 0,
+    stock: 100,
+    image_url: `/products/rubber-${a}.jpg`,
+    image_2_url: `/products/rubber-${b}.jpg`,
+    image_3_url: `/products/rubber-${c}.jpg`,
+    product_video_url: `/media/product-demo-${video}.mp4`,
+    is_active: true,
+    sort_order: index + 1
+  })
+);
+
+const defaultFrames: FrameWithProducts[] = [
   {
     id: 1,
-    name: 'Soft Black Rubber',
-    description: 'Rubber with washer for chicken machines',
-    price: 0,
-    stock: 100,
-    image_url: '/products/rubber-1.jpg',
-    image_2_url: '/products/rubber-2.jpg',
-    image_3_url: '/products/rubber-3.jpg',
-    product_video_url: '/media/product-demo-1.mp4',
+    title: defaultFrameSeeds[0].title,
+    subtitle: defaultFrameSeeds[0].subtitle,
     is_active: true,
-    sort_order: 1
-  },
-  {
-    id: 2,
-    name: 'Flexible Rubber',
-    description: 'Soft and flexible machine rubber',
-    price: 0,
-    stock: 100,
-    image_url: '/products/rubber-2.jpg',
-    image_2_url: '/products/rubber-3.jpg',
-    image_3_url: '/products/rubber-4.jpg',
-    product_video_url: '/media/product-demo-2.mp4',
-    is_active: true,
-    sort_order: 2
-  },
-  {
-    id: 3,
-    name: 'Rubber Pair',
-    description: 'Machine rubber shown as a pair',
-    price: 0,
-    stock: 100,
-    image_url: '/products/rubber-3.jpg',
-    image_2_url: '/products/rubber-4.jpg',
-    image_3_url: '/products/rubber-1.jpg',
-    product_video_url: '/media/product-demo-1.mp4',
-    is_active: true,
-    sort_order: 3
-  },
-  {
-    id: 4,
-    name: 'Long Machine Rubber',
-    description: 'Long rubber part for chicken machines',
-    price: 0,
-    stock: 100,
-    image_url: '/products/rubber-4.jpg',
-    image_2_url: '/products/rubber-1.jpg',
-    image_3_url: '/products/rubber-2.jpg',
-    product_video_url: '/media/product-demo-2.mp4',
-    is_active: true,
-    sort_order: 4
+    sort_order: 1,
+    products: defaultProducts
   }
 ];
+
+export const PRODUCT_COLUMNS = `id, frame_id, name, description, price::float8 AS price, stock,
+  image_url, image_2_url, image_3_url, product_video_url, is_active, sort_order`;
 
 function getPool() {
   if (!DATABASE_URL) return undefined;
   if (!pool) {
     pool = new Pool({
       connectionString: DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
       max: 5
     });
   }
@@ -89,152 +71,54 @@ function getPool() {
 
 export async function initDb() {
   const db = getPool();
-  if (!db || initialized) return Boolean(db);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS site_settings (
-      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-      business_name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      secondary_phone TEXT NOT NULL DEFAULT '',
-      email TEXT NOT NULL,
-      whatsapp TEXT NOT NULL,
-      upi_id TEXT NOT NULL DEFAULT '',
-      qr_url TEXT NOT NULL DEFAULT '',
-      hero_image_url TEXT NOT NULL,
-      video_1_url TEXT NOT NULL,
-      video_2_url TEXT NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS products (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      price NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
-      stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-      image_url TEXT NOT NULL DEFAULT '',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS orders (
-      id UUID PRIMARY KEY,
-      order_number BIGSERIAL UNIQUE NOT NULL,
-      customer_name TEXT NOT NULL,
-      mobile_primary TEXT NOT NULL,
-      mobile_secondary TEXT NOT NULL DEFAULT '',
-      pincode TEXT NOT NULL,
-      state TEXT NOT NULL,
-      district TEXT NOT NULL,
-      city TEXT NOT NULL,
-      locality TEXT NOT NULL,
-      road TEXT NOT NULL DEFAULT '',
-      landmark TEXT NOT NULL DEFAULT '',
-      shop_name TEXT NOT NULL DEFAULT '',
-      payment_method TEXT NOT NULL CHECK (payment_method IN ('cod', 'upi')),
-      items JSONB NOT NULL,
-      total NUMERIC(12, 2) NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'confirmed',
-      notifications JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS image_2_url TEXT NOT NULL DEFAULT '';
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS image_3_url TEXT NOT NULL DEFAULT '';
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS product_video_url TEXT NOT NULL DEFAULT '';
-  `);
-
-  await db.query(`
-    UPDATE products SET
-      image_2_url = CASE ((sort_order - 1) % 4) + 1
-        WHEN 1 THEN '/products/rubber-2.jpg'
-        WHEN 2 THEN '/products/rubber-3.jpg'
-        WHEN 3 THEN '/products/rubber-4.jpg'
-        ELSE '/products/rubber-1.jpg'
-      END,
-      image_3_url = CASE ((sort_order - 1) % 4) + 1
-        WHEN 1 THEN '/products/rubber-3.jpg'
-        WHEN 2 THEN '/products/rubber-4.jpg'
-        WHEN 3 THEN '/products/rubber-1.jpg'
-        ELSE '/products/rubber-2.jpg'
-      END,
-      product_video_url = CASE WHEN sort_order % 2 = 0
-        THEN '/media/product-demo-2.mp4' ELSE '/media/product-demo-1.mp4' END
-    WHERE image_2_url = '' OR image_3_url = '' OR product_video_url = ''
-  `);
-
-  await db.query(
-    `INSERT INTO site_settings (
-      id, business_name, phone, secondary_phone, email, whatsapp, upi_id, qr_url,
-      hero_image_url, video_1_url, video_2_url
-    ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    ON CONFLICT (id) DO NOTHING`,
-    [
-      defaultSettings.business_name,
-      defaultSettings.phone,
-      defaultSettings.secondary_phone,
-      defaultSettings.email,
-      defaultSettings.whatsapp,
-      defaultSettings.upi_id,
-      defaultSettings.qr_url,
-      defaultSettings.hero_image_url,
-      defaultSettings.video_1_url,
-      defaultSettings.video_2_url
-    ]
-  );
-
-  const count = await db.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM products');
-  if (Number(count.rows[0]?.count) === 0) {
-    for (const product of defaultProducts) {
-      await db.query(
-        `INSERT INTO products (name, description, price, stock, image_url, image_2_url, image_3_url,
-         product_video_url, is_active, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [
-          product.name,
-          product.description,
-          product.price,
-          product.stock,
-          product.image_url,
-          product.image_2_url,
-          product.image_3_url,
-          product.product_video_url,
-          product.is_active,
-          product.sort_order
-        ]
-      );
-    }
-  }
-
-  initialized = true;
+  if (!db) return false;
+  initialized ??= migrate(db).catch((error) => {
+    initialized = undefined;
+    throw error;
+  });
+  await initialized;
   return true;
 }
 
 export async function getStorefront() {
   const db = getPool();
-  if (!db) return { settings: defaultSettings, products: defaultProducts, databaseReady: false };
+  const fallback = { settings: defaultSettings, frames: defaultFrames, databaseReady: false };
+  if (!db) return fallback;
 
   try {
     await initDb();
-    const [settingsResult, productsResult] = await Promise.all([
+    const [settingsResult, framesResult, productsResult] = await Promise.all([
       db.query<SiteSettings>('SELECT * FROM site_settings WHERE id = 1'),
+      db.query<Frame>(
+        `SELECT id, title, subtitle, is_active, sort_order FROM frames
+         WHERE is_active = TRUE ORDER BY sort_order, id`
+      ),
       db.query<Product>(
-        `SELECT id, name, description, price::float8 AS price, stock, image_url, image_2_url,
-         image_3_url, product_video_url, is_active, sort_order FROM products
-         WHERE is_active = TRUE ORDER BY sort_order, id LIMIT 4`
+        `SELECT ${PRODUCT_COLUMNS} FROM products p
+         WHERE is_active = TRUE AND EXISTS (
+           SELECT 1 FROM frames f WHERE f.id = p.frame_id AND f.is_active = TRUE
+         )
+         ORDER BY sort_order, id`
       )
     ]);
+
+    const frames = framesResult.rows
+      .map((frame) => ({
+        ...frame,
+        products: productsResult.rows
+          .filter((product) => product.frame_id === frame.id)
+          .slice(0, PRODUCTS_PER_FRAME)
+      }))
+      .filter((frame) => frame.products.length > 0);
+
     return {
       settings: settingsResult.rows[0] ?? defaultSettings,
-      products: productsResult.rows.length ? productsResult.rows : defaultProducts,
+      frames,
       databaseReady: true
     };
   } catch (error) {
     console.error('Database unavailable, using storefront defaults', error);
-    return { settings: defaultSettings, products: defaultProducts, databaseReady: false };
+    return fallback;
   }
 }
 

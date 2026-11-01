@@ -1,40 +1,50 @@
 <script lang="ts">
+  import Icon from '../lib/components/Icon.svelte';
+  import Logo from '../lib/components/Logo.svelte';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
 
-  let checkoutOpen = $state(false);
+  const productLines = [
+    'Chicken feather cleaning machines',
+    'Chicken cutting machines',
+    'Rubbers & bushes',
+    'Commercial mixers',
+    'Grinders',
+    'Dough kneading machines'
+  ];
+  const yearsInTrade = new Date().getFullYear() - 2004;
+
   let submitting = $state(false);
   let errorMessage = $state('');
-  let orderNumber = $state('');
+  let requestNumber = $state('');
   let activeProduct = $state<Product | null>(null);
   let activeMediaIndex = $state(0);
-  let selectedProductId = $state(0);
 
   let form = $state({
     customer_name: '',
     mobile_primary: '',
     mobile_secondary: '',
-    pincode: '',
-    state: '',
-    district: '',
     city: '',
-    locality: '',
-    road: '',
-    landmark: '',
+    state: '',
+    pincode: '',
     shop_name: '',
-    payment_method: 'cod'
+    product_id: '',
+    message: ''
   });
 
-  const selectedItems = $derived.by(() => {
-    const product = data.products.find((item) => item.id === Number(selectedProductId));
-    return product && product.stock > 0 ? [{ ...product, quantity: 1 }] : [];
-  });
-  const total = $derived(selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0));
+  const allProducts = $derived(data.frames.flatMap((frame) => frame.products));
+  const heroProducts = $derived(allProducts.slice(0, 4));
+  const aboutImages = $derived([allProducts[0]?.image_url, allProducts[1]?.image_url]);
+  const phone = $derived(data.settings.phone);
+  const phoneLabel = $derived(formatPhone(phone));
+  const allPhones = $derived(
+    [phone, data.settings.secondary_phone].filter(Boolean).map(formatPhone).join('  ·  ')
+  );
   const whatsappNumber = $derived(data.settings.whatsapp.replace(/\D/g, '').slice(-10));
   const whatsappHref = $derived(
-    `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent('Hello Raghav, I want to know about chicken machine rubber.')}`
+    `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent('Hello Naazare Enterprises, I would like to know more about your products.')}`
   );
 
   $effect(() => {
@@ -45,27 +55,20 @@
     };
   });
 
-  $effect(() => {
-    const selectionIsAvailable = data.products.some(
-      (product) => product.id === Number(selectedProductId) && product.stock > 0
-    );
-    if (!selectionIsAvailable) {
-      selectedProductId =
-        data.products.find((product) => product.stock > 0)?.id ?? data.products[0]?.id ?? 0;
-    }
-  });
-
   function productMedia(product: Product) {
-    return [
-      { type: 'image' as const, src: product.image_url, label: 'Photo 1' },
-      { type: 'image' as const, src: product.image_2_url || product.image_url, label: 'Photo 2' },
-      { type: 'image' as const, src: product.image_3_url || product.image_url, label: 'Photo 3' },
-      {
-        type: 'video' as const,
-        src: product.product_video_url || data.settings.video_1_url,
-        label: 'Video'
-      }
-    ];
+    const images = [...new Set([product.image_url, product.image_2_url, product.image_3_url])]
+      .filter(Boolean)
+      .map((src, index) => ({ type: 'image' as const, src, label: `Photo ${index + 1}` }));
+    return product.product_video_url
+      ? [...images, { type: 'video' as const, src: product.product_video_url, label: 'Video' }]
+      : images;
+  }
+
+  function mediaLabel(product: Product) {
+    const media = productMedia(product);
+    const photos = media.filter((item) => item.type === 'image').length;
+    const video = media.length > photos ? ' + video' : '';
+    return `${photos} photo${photos === 1 ? '' : 's'}${video}`;
   }
 
   function openProduct(product: Product) {
@@ -82,15 +85,17 @@
     if (event.key === 'Escape' && activeProduct) closeProduct();
   }
 
-  function startOrder() {
-    checkoutOpen = true;
-    setTimeout(
-      () => document.getElementById('order-form')?.scrollIntoView({ behavior: 'smooth' }),
-      50
-    );
+  function requestCallback(product?: Product) {
+    if (product) form.product_id = String(product.id);
+    closeProduct();
+    requestNumber = '';
+    setTimeout(() => {
+      document.getElementById('callback')?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('customer-name')?.focus({ preventScroll: true });
+    }, 50);
   }
 
-  async function submitOrder(event: SubmitEvent) {
+  async function submitRequest(event: SubmitEvent) {
     event.preventDefault();
     errorMessage = '';
     submitting = true;
@@ -99,23 +104,21 @@
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          items: selectedItems.map((item) => ({ id: item.id, quantity: item.quantity }))
-        })
+        body: JSON.stringify({ ...form, product_id: Number(form.product_id) || null })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Could not place order');
-      orderNumber = result.orderNumber;
-      setTimeout(
-        () => document.getElementById('order-success')?.scrollIntoView({ behavior: 'smooth' }),
-        50
-      );
+      if (!response.ok) throw new Error(result.error || 'Could not send your request');
+      requestNumber = result.requestNumber;
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Could not place order';
+      errorMessage = error instanceof Error ? error.message : 'Could not send your request';
     } finally {
       submitting = false;
     }
+  }
+
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, '').slice(-10);
+    return digits.length === 10 ? `+91 ${digits.slice(0, 5)} ${digits.slice(5)}` : value;
   }
 
   function money(value: number) {
@@ -130,198 +133,307 @@
 <svelte:window onkeydown={handleGalleryKey} />
 
 <svelte:head>
-  <title>Raghav Chicken Machine Rubber | Since 2004</title>
+  <title>{data.settings.business_name} | Commercial Kitchen Equipment Since 2004</title>
   <meta
     name="description"
-    content="Chicken machine rubber delivered across India. Call, WhatsApp or order online with cash on delivery and UPI."
+    content="Naazare Enterprises — dealers in commercial kitchen equipment since 2004. Chicken feather cleaning machines, chicken cutting machines, rubbers and bushes, commercial mixers, grinders and dough kneading machines."
   />
 </svelte:head>
 
-<div class="announcement">
-  <span>Cash on delivery across India</span>
-  <a href={`tel:${data.settings.phone}`}>{data.settings.phone}</a>
+<div class="infobar">
+  <div class="container infobar-inner">
+    <div class="infobar-details">
+      <span class="infobar-item infobar-address"
+        ><Icon name="pin" size={15} />{data.settings.address ||
+          'Dealers in commercial kitchen equipment since 2004'}</span
+      >
+      <a class="infobar-item" href={`tel:${phone}`}><Icon name="phone" size={15} />{phoneLabel}</a>
+      <a class="infobar-item infobar-email" href={`mailto:${data.settings.email}`}
+        ><Icon name="mail" size={15} />{data.settings.email}</a
+      >
+    </div>
+    <div class="infobar-social">
+      <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp"
+        ><Icon name="whatsapp" size={16} /></a
+      >
+      <a href={`tel:${phone}`} aria-label="Call"><Icon name="phone" size={15} /></a>
+      <a href={`mailto:${data.settings.email}`} aria-label="Email"><Icon name="mail" size={15} /></a
+      >
+    </div>
+  </div>
 </div>
+
 <header class="topbar">
-  <a class="brand" href="#home" aria-label="Raghav home">
-    <strong>RAGHAV</strong><small>Chicken Machine Rubber</small>
-  </a>
-  <nav class="desktop-nav" aria-label="Main navigation">
-    <a href="#products">Products</a>
-    <a href="#demo">Watch</a>
-    <a href="#order">How to order</a>
-  </nav>
-  <a class="call-mini" href={`tel:${data.settings.phone}`} aria-label="Call Raghav">Call</a>
+  <div class="container topbar-inner">
+    <Logo href="#home" />
+    <nav class="desktop-nav" aria-label="Main navigation">
+      <a href="#home">Home</a>
+      <a href="#about">About</a>
+      <a href="#products">Products</a>
+      <a href="#videos">Videos</a>
+      <a href="#callback">Contact</a>
+    </nav>
+    <a class="header-call" href={`tel:${phone}`}>
+      <span class="header-call-icon"><Icon name="chat" size={22} /></span>
+      <span class="header-call-text"
+        ><small>Have any questions?</small><strong>Call: {phoneLabel}</strong></span
+      >
+    </a>
+    <a class="button primary header-call-mobile" href={`tel:${phone}`}
+      ><Icon name="phone" size={16} />Call</a
+    >
+  </div>
 </header>
 
 <main>
-  <section class="hero section" id="home">
-    <div class="hero-copy">
-      <div class="eyebrow">Raghav · Since 2004</div>
-      <h1>Built for<br />the work.</h1>
-      <p>Chicken machine rubber, shown clearly and delivered simply.</p>
-      <div class="hero-services" aria-label="Service benefits">
-        <div class="cod-pulse"><strong>Cash on delivery</strong><span>Pay on arrival</span></div>
-        <div><strong>Delivery across India</strong><span>Doorstep service</span></div>
-        <div><strong>Direct support</strong><span>Call for help</span></div>
+  <section
+    class="hero"
+    class:has-image={!!data.settings.hero_image_url}
+    id="home"
+    style={data.settings.hero_image_url
+      ? `--hero-image: url('${data.settings.hero_image_url}')`
+      : undefined}
+  >
+    <div class="container hero-inner">
+      <div class="hero-head">
+        <div class="hero-copy">
+          <p class="eyebrow">Commercial kitchen equipment · Since 2004</p>
+          <h1><span>Naazare</span> Enterprises</h1>
+          <p class="hero-lead">
+            Dependable machines and genuine spare parts for poultry shops, hotels, bakeries and
+            commercial kitchens.
+          </p>
+          <div class="hero-actions">
+            <button class="button primary" type="button" onclick={() => requestCallback()}
+              >Request a callback <Icon name="arrow" size={16} /></button
+            >
+            <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
+              ><Icon name="whatsapp" size={18} />WhatsApp us</a
+            >
+          </div>
+        </div>
+        <div class="seal" aria-label={`${yearsInTrade} years of trust`}>
+          <span class="seal-since">Since 2004</span>
+          <strong>{yearsInTrade}</strong>
+          <span class="seal-label">Years of trust</span>
+        </div>
       </div>
+
+      {#if heroProducts.length}
+        <div class="lineup" aria-label="Featured products">
+          {#each heroProducts as product, index}
+            <button
+              type="button"
+              class="lineup-item"
+              onclick={() => openProduct(product)}
+              aria-label={`View ${product.name}`}
+            >
+              <span class="lineup-image"
+                ><img src={product.image_url} alt="" loading={index > 1 ? 'lazy' : 'eager'} /></span
+              >
+              <span class="lineup-name">{product.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
-    <div class="hero-visual">
-      <div class="poster-wrap">
-        <img src={data.settings.hero_image_url} alt="Raghav Chicken Machine Rubber poster" />
+    <div class="hero-band">
+      <div class="container hero-band-inner">
+        <span
+          ><Icon name="truck" size={18} />{data.settings.address || 'Delivery across India'}</span
+        >
+        <a href={`tel:${phone}`}><Icon name="phone" size={16} />{allPhones}</a>
       </div>
-      <div class="floating-note"><strong>Since</strong><span>2004</span></div>
     </div>
   </section>
 
-  <section class="products-section section" id="products">
-    <div class="product-grid">
-      {#each data.products as product, index}
-        <article class="product-card">
-          <button
-            class="product-image product-media-button"
-            type="button"
-            onclick={() => openProduct(product)}
-            aria-label={`Open photos and video for ${product.name}`}
+  <section class="stats" aria-label="Highlights">
+    <div class="container stats-inner">
+      <div><strong>2004</strong><span>Established and trusted by kitchens</span></div>
+      <div><strong>{yearsInTrade}+</strong><span>Years of experience in the trade</span></div>
+      <div><strong>{productLines.length}+</strong><span>Product lines and growing</span></div>
+      <div><strong>India</strong><span>Delivery to your doorstep</span></div>
+    </div>
+  </section>
+
+  <section class="section" id="about">
+    <div class="container about">
+      <div class="about-media">
+        {#if aboutImages[0]}
+          <img class="about-main" src={aboutImages[0]} alt="Naazare Enterprises product" />
+        {/if}
+        {#if aboutImages[1]}
+          <img class="about-inset" src={aboutImages[1]} alt="" loading="lazy" />
+        {/if}
+        <div class="about-badge"><strong>{yearsInTrade}+</strong><span>Years of trust</span></div>
+      </div>
+      <div class="about-copy">
+        <p class="eyebrow-text">About us</p>
+        <h2>Naazare Enterprises</h2>
+        <p class="about-lead">Dealers in commercial kitchen equipment since 2004.</p>
+        <p>
+          For over two decades we have supplied hard-working machines and genuine spare parts to
+          poultry shops, hotels, bakeries and commercial kitchens. Every enquiry is handled
+          personally — we help you choose the right machine, share the price and arrange delivery.
+        </p>
+        <h3>Products include</h3>
+        <ul class="product-lines">
+          {#each productLines as line}<li><Icon name="check" size={16} />{line}</li>{/each}
+          <li class="more">…and more</li>
+        </ul>
+        <div class="about-actions">
+          <button class="button primary" type="button" onclick={() => requestCallback()}
+            >Request a callback</button
           >
-            <img
-              src={product.image_url}
-              alt={product.name}
-              loading={index > 1 ? 'lazy' : 'eager'}
-            />
-            {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
-                class="stock out">Out of stock</span
-              >{/if}
-            <span class="view-media" aria-hidden="true">View 3 photos + video</span>
-          </button>
-          <div class="product-info">
-            <div class="product-bottom">
-              <div class="price-block">
-                <span>Price</span><strong
-                  >{product.price > 0 ? money(product.price) : 'Ask price'}</strong
-                >
-              </div>
-              <div class="quantity-block">
-                <span>Quantity</span>
-                <strong>{product.stock}</strong>
-              </div>
+          <a class="button" href="#products">View products</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section products" id="products">
+    <div class="container">
+      <div class="section-heading centered">
+        <p class="eyebrow-text">Our products</p>
+        <h2>Browse by range</h2>
+        <p>Tap any product to see photos and video. Ask for a callback to get the latest price.</p>
+      </div>
+
+      {#each data.frames as frame, frameIndex}
+        <div class="frame" id={`frame-${frame.id}`}>
+          <div class="frame-head">
+            <span class="frame-number">{String(frameIndex + 1).padStart(2, '0')}</span>
+            <div class="frame-title">
+              <h3>{frame.title}</h3>
+              {#if frame.subtitle}<p>{frame.subtitle}</p>{/if}
             </div>
+            <button class="frame-enquire" type="button" onclick={() => requestCallback()}
+              >Enquire about this range <Icon name="arrow" size={15} /></button
+            >
           </div>
-        </article>
+          <div class="product-grid">
+            {#each frame.products as product, index}
+              <article class="product-card">
+                <button
+                  class="product-image"
+                  type="button"
+                  onclick={() => openProduct(product)}
+                  aria-label={`Open photos and video for ${product.name}`}
+                >
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    loading={frameIndex > 0 || index > 1 ? 'lazy' : 'eager'}
+                  />
+                  {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
+                      class="stock out">Out of stock</span
+                    >{/if}
+                  <span class="view-media" aria-hidden="true">{mediaLabel(product)}</span>
+                </button>
+                <div class="product-info">
+                  <h4>{product.name}</h4>
+                  <div class="product-meta">
+                    <div>
+                      <span>Price</span><strong
+                        >{product.price > 0 ? money(product.price) : 'Ask price'}</strong
+                      >
+                    </div>
+                    <div>
+                      <span>Quantity</span><strong>{product.stock}</strong>
+                    </div>
+                  </div>
+                  <button class="enquire" type="button" onclick={() => requestCallback(product)}
+                    >Enquire <Icon name="arrow" size={15} /></button
+                  >
+                </div>
+              </article>
+            {/each}
+          </div>
+        </div>
       {/each}
     </div>
   </section>
 
-  <section class="video-section section" id="demo">
-    <div class="section-heading light">
-      <div>
-        <span class="section-number">02</span>
-        <p class="eyebrow-text">See every detail</p>
+  <section class="videos section" id="videos">
+    <div class="container">
+      <div class="section-heading centered light">
+        <p class="eyebrow-text">See it working</p>
+        <h2>Know what arrives</h2>
+        <p>Short, clear videos of our products — made for your phone.</p>
       </div>
-      <h2>Know what arrives.</h2>
-      <p>Short, clear videos made for your phone.</p>
-    </div>
-    <div class="video-grid">
-      <article>
-        <video controls playsinline preload="metadata" src={data.settings.video_1_url}>
-          <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
-        </video>
-        <div><span>Product film 01</span><strong>Rubber and washer</strong></div>
-      </article>
-      <article>
-        <video controls playsinline preload="metadata" src={data.settings.video_2_url}>
-          <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
-        </video>
-        <div><span>Product film 02</span><strong>Close-up and flexibility</strong></div>
-      </article>
+      <div class="video-grid">
+        <article>
+          <video controls playsinline preload="metadata" src={data.settings.video_1_url}>
+            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
+          </video>
+          <div><span>Film 01</span><strong>Rubber and washer</strong></div>
+        </article>
+        <article>
+          <video controls playsinline preload="metadata" src={data.settings.video_2_url}>
+            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
+          </video>
+          <div><span>Film 02</span><strong>Close-up and flexibility</strong></div>
+        </article>
+      </div>
     </div>
   </section>
 
-  <section class="order-section section" id="order">
-    <div class="section-heading">
-      <div>
-        <span class="section-number">03</span>
-        <p class="eyebrow-text">Choose your way</p>
+  <section class="section callback-section" id="callback">
+    <div class="container callback">
+      <div class="callback-intro">
+        <p class="eyebrow-text">Request a callback</p>
+        <h2>Tell us what you need. We’ll call you back.</h2>
+        <p>
+          Share your details and the product you are interested in. Our team will call you with the
+          price, availability and delivery options.
+        </p>
+        <ol class="steps">
+          <li><strong>Share your details</strong><span>Takes less than a minute.</span></li>
+          <li>
+            <strong>We call you back</strong><span>During working hours, usually same day.</span>
+          </li>
+          <li>
+            <strong>Confirm and receive</strong><span>Price, delivery and support sorted.</span>
+          </li>
+        </ol>
+        <div class="direct-contact">
+          <span>Prefer to talk now?</span>
+          <div>
+            <a class="button primary" href={`tel:${phone}`}
+              ><Icon name="phone" size={16} />Call {phoneLabel}</a
+            >
+            <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
+              ><Icon name="whatsapp" size={18} />WhatsApp</a
+            >
+          </div>
+        </div>
       </div>
-      <h2>Order in a few taps.</h2>
-    </div>
-    <div class="order-options">
-      <a href={`tel:${data.settings.phone}`}>
-        <span class="option-icon">01</span>
-        <div><strong>Call Raghav</strong><small>{data.settings.phone}</small></div>
-        <b>→</b>
-      </a>
-      <a href={whatsappHref} target="_blank" rel="noreferrer">
-        <span class="option-icon green">02</span>
-        <div><strong>Message on WhatsApp</strong><small>Fastest reply</small></div>
-        <b>→</b>
-      </a>
-      <button type="button" onclick={startOrder}>
-        <span class="option-icon gold">03</span>
-        <div><strong>Order online</strong><small>COD or UPI</small></div>
-        <b>→</b>
-      </button>
-    </div>
-
-    {#if checkoutOpen}
-      <div class="checkout" id="order-form">
-        {#if orderNumber}
-          <div class="success-card" id="order-success">
+      <div class="callback-card">
+        {#if requestNumber}
+          <div class="success" role="status">
             <span class="success-icon">✓</span>
-            <p class="eyebrow-text">Order confirmed</p>
-            <h2>Thank you, {form.customer_name}!</h2>
+            <p class="eyebrow-text">Request received</p>
+            <h3>Thank you, {form.customer_name}!</h3>
             <p>
-              Your order number is <strong>#{orderNumber}</strong>. Raghav will contact you shortly.
+              Your request number is <strong>#{requestNumber}</strong>. We will call you on
+              <strong>{form.mobile_primary}</strong> shortly.
             </p>
-            <a
-              class="button whatsapp"
-              target="_blank"
-              rel="noreferrer"
-              href={`https://wa.me/91${whatsappNumber}?text=${encodeURIComponent(`Hello Raghav, I placed order #${orderNumber}. My name is ${form.customer_name}.`)}`}
-              >Send order on WhatsApp</a
+            <button
+              class="button"
+              type="button"
+              onclick={() => {
+                requestNumber = '';
+                form.product_id = '';
+                form.message = '';
+              }}>Send another request</button
             >
           </div>
         {:else}
-          <form onsubmit={submitOrder}>
-            <div class="checkout-head">
-              <div>
-                <p class="eyebrow-text">Delivery details</p>
-                <h2>Where should we send it?</h2>
-              </div>
-              <button
-                class="close"
-                type="button"
-                onclick={() => (checkoutOpen = false)}
-                aria-label="Close form">×</button
-              >
-            </div>
-
-            <label class="checkout-product">
-              <span>Choose product *</span>
-              <select bind:value={selectedProductId} required>
-                {#each data.products as product}
-                  <option value={product.id} disabled={product.stock < 1}>
-                    {product.name} · {product.price > 0 ? money(product.price) : 'Ask price'}
-                  </option>
-                {/each}
-              </select>
-            </label>
-
-            <div class="order-summary">
-              {#each selectedItems as item}
-                <div>
-                  <span>{item.name} × {item.quantity}</span><strong
-                    >{item.price ? money(item.price * item.quantity) : 'Price on call'}</strong
-                  >
-                </div>
-              {/each}
-              {#if total > 0}<div class="summary-total">
-                  <span>Total</span><strong>{money(total)}</strong>
-                </div>{/if}
-            </div>
-
+          <form onsubmit={submitRequest}>
             <div class="form-grid">
               <label class="full"
-                ><span>Customer name *</span><input
+                ><span>Your name *</span><input
+                  id="customer-name"
                   bind:value={form.customer_name}
                   required
                   autocomplete="name"
@@ -331,129 +443,138 @@
                 ><span>Mobile number *</span><input
                   bind:value={form.mobile_primary}
                   required
+                  type="tel"
                   inputmode="numeric"
-                  minlength="10"
+                  pattern={'[0-9]{10}'}
                   maxlength="10"
-                  autocomplete="tel"
+                  autocomplete="tel-national"
+                  title="10-digit mobile number"
                 /></label
               >
               <label
-                ><span>Second mobile (optional)</span><input
+                ><span>Alternate mobile</span><input
                   bind:value={form.mobile_secondary}
+                  type="tel"
                   inputmode="numeric"
                   maxlength="10"
                 /></label
               >
               <label
-                ><span>PIN code *</span><input
-                  bind:value={form.pincode}
+                ><span>Town / city *</span><input
+                  bind:value={form.city}
                   required
+                  autocomplete="address-level2"
+                /></label
+              >
+              <label
+                ><span>State</span><input
+                  bind:value={form.state}
+                  autocomplete="address-level1"
+                /></label
+              >
+              <label
+                ><span>PIN code</span><input
+                  bind:value={form.pincode}
                   inputmode="numeric"
                   pattern={'[0-9]{6}'}
                   maxlength="6"
                   autocomplete="postal-code"
                 /></label
               >
-              <label
-                ><span>State *</span><input
-                  bind:value={form.state}
-                  required
-                  autocomplete="address-level1"
-                /></label
-              >
-              <label><span>District *</span><input bind:value={form.district} required /></label>
-              <label
-                ><span>Village / town / city *</span><input
-                  bind:value={form.city}
-                  required
-                  autocomplete="address-level2"
-                /></label
+              <label><span>Shop / business name</span><input bind:value={form.shop_name} /></label>
+              <label class="full"
+                ><span>Interested in</span><select bind:value={form.product_id}>
+                  <option value="">Not sure yet / something else</option>
+                  {#each data.frames as frame}
+                    <optgroup label={frame.title}>
+                      {#each frame.products as product}
+                        <option value={String(product.id)}>{product.name}</option>
+                      {/each}
+                    </optgroup>
+                  {/each}
+                </select></label
               >
               <label class="full"
-                ><span>Locality / area *</span><input
-                  bind:value={form.locality}
-                  required
-                  autocomplete="address-line2"
-                /></label
+                ><span>Message</span><textarea
+                  bind:value={form.message}
+                  rows="3"
+                  placeholder="Quantity, model, or anything we should know"></textarea></label
               >
-              <label class="full"
-                ><span>Road name</span><input
-                  bind:value={form.road}
-                  autocomplete="address-line1"
-                /></label
-              >
-              <label><span>Landmark</span><input bind:value={form.landmark} /></label>
-              <label><span>Shop name</span><input bind:value={form.shop_name} /></label>
             </div>
-
-            <fieldset>
-              <legend>Choose payment *</legend>
-              <label class:chosen={form.payment_method === 'cod'} class="payment-choice">
-                <input type="radio" bind:group={form.payment_method} value="cod" />
-                <span
-                  ><strong>Cash on delivery</strong><small>Pay when your order arrives</small></span
-                >
-                <b>COD</b>
-              </label>
-              <label class:chosen={form.payment_method === 'upi'} class="payment-choice">
-                <input type="radio" bind:group={form.payment_method} value="upi" />
-                <span
-                  ><strong>Pay with UPI</strong><small
-                    >{data.settings.upi_id || 'UPI details shared after confirmation'}</small
-                  ></span
-                >
-                <b>UPI</b>
-              </label>
-            </fieldset>
-
-            {#if form.payment_method === 'upi' && data.settings.qr_url}
-              <div class="qr-card">
-                <img src={data.settings.qr_url} alt="UPI QR code" /><span>Scan to pay</span>
-              </div>
-            {/if}
-
             {#if errorMessage}<p class="form-error" role="alert">{errorMessage}</p>{/if}
             <button class="button primary submit" type="submit" disabled={submitting}>
-              {submitting ? 'Placing order…' : 'Confirm order'}
+              {submitting ? 'Sending…' : 'Request a callback'}
             </button>
-            <p class="privacy-note">Your details are used only to deliver this order.</p>
+            <p class="privacy-note">
+              We only use your details to call you back about this request.
+            </p>
           </form>
         {/if}
       </div>
-    {/if}
+    </div>
   </section>
+</main>
 
-  <section class="contact-section section" id="contact">
-    <div class="contact-card">
-      <div>
-        <p class="eyebrow-text">Direct support</p>
-        <h2>Questions? Ask Raghav.</h2>
-        <p>Call or WhatsApp for product, price and delivery help.</p>
-      </div>
-      <div class="contact-actions">
-        <a class="button light-button" href={`tel:${data.settings.phone}`}
-          >Call {data.settings.phone}</a
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <Logo href="#home" tone="light" />
+      <p>Dealers in commercial kitchen equipment since 2004.</p>
+      <div class="footer-social">
+        <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp"
+          ><Icon name="whatsapp" size={17} /></a
         >
-        <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
-          >WhatsApp now</a
+        <a href={`tel:${phone}`} aria-label="Call"><Icon name="phone" size={16} /></a>
+        <a href={`mailto:${data.settings.email}`} aria-label="Email"
+          ><Icon name="mail" size={16} /></a
         >
       </div>
     </div>
-    <footer>
-      <div>
-        <strong>{data.settings.business_name}</strong><span
-          >Since 2004 · Cash on delivery all over India</span
-        >
-      </div>
-      <a href={`mailto:${data.settings.email}`}>{data.settings.email}</a>
-    </footer>
-  </section>
-</main>
+    <div>
+      <h3>Products</h3>
+      <ul>
+        {#each productLines as line}<li>{line}</li>{/each}
+      </ul>
+    </div>
+    <div>
+      <h3>Quick links</h3>
+      <ul>
+        <li><a href="#about">About us</a></li>
+        <li><a href="#products">Products</a></li>
+        <li><a href="#videos">Videos</a></li>
+        <li><a href="#callback">Request a callback</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Contact</h3>
+      <ul class="footer-contact">
+        {#if data.settings.address}<li>
+            <Icon name="pin" size={15} />{data.settings.address}
+          </li>{/if}
+        <li><Icon name="phone" size={15} /><a href={`tel:${phone}`}>{phoneLabel}</a></li>
+        {#if data.settings.secondary_phone}<li>
+            <Icon name="phone" size={15} /><a href={`tel:${data.settings.secondary_phone}`}
+              >{formatPhone(data.settings.secondary_phone)}</a
+            >
+          </li>{/if}
+        <li>
+          <Icon name="mail" size={15} /><a href={`mailto:${data.settings.email}`}
+            >{data.settings.email}</a
+          >
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© {new Date().getFullYear()} {data.settings.business_name}. All rights reserved.</span>
+    <span>Since 2004 · Delivery across India</span>
+  </div>
+</footer>
 
 {#if activeProduct}
   {@const viewedProduct = activeProduct}
   {@const media = productMedia(viewedProduct)}
-  {@const selectedMedia = media[activeMediaIndex]}
+  {@const selectedMedia = media[activeMediaIndex] ?? media[0]}
   <div class="product-viewer" role="presentation">
     <button class="viewer-backdrop" type="button" onclick={closeProduct} aria-label="Close gallery"
     ></button>
@@ -484,37 +605,49 @@
         {/each}
       </div>
       <div class="viewer-stage">
-        {#if selectedMedia.type === 'image'}
+        {#if selectedMedia?.type === 'image'}
           <img src={selectedMedia.src} alt={viewedProduct.name} />
-        {:else}
+        {:else if selectedMedia}
           <video src={selectedMedia.src} controls autoplay playsinline preload="metadata">
             <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
           </video>
         {/if}
       </div>
       <div class="viewer-purchase">
-        <div>
-          <span>Price</span><strong
-            >{viewedProduct.price > 0 ? money(viewedProduct.price) : 'Ask price'}</strong
-          >
+        <h3>{viewedProduct.name}</h3>
+        {#if viewedProduct.description}<p>{viewedProduct.description}</p>{/if}
+        <div class="product-meta">
+          <div>
+            <span>Price</span><strong
+              >{viewedProduct.price > 0 ? money(viewedProduct.price) : 'Ask price'}</strong
+            >
+          </div>
+          <div>
+            <span>Quantity</span><strong>{viewedProduct.stock}</strong>
+          </div>
         </div>
-        <div class="quantity-block">
-          <span>Quantity</span>
-          <strong>{viewedProduct.stock}</strong>
-        </div>
+        <button class="button primary" type="button" onclick={() => requestCallback(viewedProduct)}
+          >Request a callback</button
+        >
       </div>
     </div>
   </div>
 {/if}
 
+<a
+  class="whatsapp-float"
+  href={whatsappHref}
+  target="_blank"
+  rel="noreferrer"
+  aria-label="Chat on WhatsApp"><Icon name="whatsapp" size={30} /></a
+>
+
 <nav class="mobile-dock" aria-label="Quick actions">
-  <a href={`tel:${data.settings.phone}`}><span>☎</span>Call</a>
-  <a href={whatsappHref} target="_blank" rel="noreferrer"><span>◉</span>WhatsApp</a>
-  <button
-    type="button"
-    onclick={() => {
-      closeProduct();
-      startOrder();
-    }}><span>↗</span>Order</button
+  <a href={`tel:${phone}`}><Icon name="phone" size={18} />Call</a>
+  <a href={whatsappHref} target="_blank" rel="noreferrer"
+    ><Icon name="whatsapp" size={19} />WhatsApp</a
+  >
+  <button type="button" onclick={() => requestCallback()}
+    ><Icon name="chat" size={18} />Callback</button
   >
 </nav>

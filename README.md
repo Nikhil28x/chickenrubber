@@ -1,17 +1,17 @@
-# Raghav Chicken Machine Rubber
+# Naazare Enterprises
 
-Mobile-first Svelte 5 / SvelteKit storefront and admin dashboard for Raghav Chicken Machine Rubber.
+Mobile-first Svelte 5 / SvelteKit storefront and admin dashboard for Naazare Enterprises — dealers in commercial kitchen equipment since 2004.
 
 ## Included
 
-- Five-section responsive storefront with a 2×2 mobile product grid
-- Four editable products with image, price, quantity and visibility controls
-- Two product videos and a redesigned blue-and-white brand poster
+- Responsive storefront: info bar, header, hero, highlights strip, About Us, product frames, videos, callback form and footer
+- Product frames: rows of four products, each switched on or off from `/admin` (new frames appear below the live ones)
+- Six frames seeded on first run — Rubbers & bushes is live, the others are hidden until filled in
+- Each product has three photos, one video, price, quantity and visibility controls
 - Call and WhatsApp links for `9900281928`
-- Online order form with the requested Indian address fields
-- Cash on delivery and UPI/QR options
-- Neon PostgreSQL persistence for settings, products and orders
-- Protected `/admin` dashboard for orders, product editing and business/media settings
+- "Request a callback" form (name, phones, location, product of interest, message) — no online payment
+- Neon PostgreSQL persistence for settings, frames, products and callback requests
+- Protected `/admin` dashboard for callback requests, product frames and business/media settings
 - Optional Twilio WhatsApp/SMS, Resend email and generic webhook notifications
 
 ## Local setup
@@ -25,13 +25,13 @@ The requested initial login is `admin` / `Password@123`. Set `ADMIN_USERNAME` an
 
 ## Notification setup
 
-Orders always appear in `/admin`. To deliver owner notifications through external services, configure:
+Callback requests always appear in `/admin`. To deliver owner notifications through external services, configure:
 
 - WhatsApp and SMS: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_SMS_FROM`, `TWILIO_WHATSAPP_FROM`
 - Email: `RESEND_API_KEY`, `EMAIL_FROM`
 - Any automation service: `ORDER_WEBHOOK_URL`
 
-Notification delivery results are stored with each order in the `notifications` JSON column.
+Notification delivery results are stored with each request in the `notifications` JSON column.
 
 ## Checks
 

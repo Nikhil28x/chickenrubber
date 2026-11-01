@@ -16,7 +16,7 @@ export const actions: Actions = {
       return fail(400, { error: 'Incorrect username or password', username });
     }
 
-    cookies.set('raghav_admin', createAdminToken(), {
+    cookies.set('naazare_admin', createAdminToken(), {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',

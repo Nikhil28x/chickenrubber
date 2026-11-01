@@ -1,7 +1,12 @@
 <script lang="ts">
+  import Logo from '../../lib/components/Logo.svelte';
+  import { untrack } from 'svelte';
   import type { ActionData, PageData } from './$types';
   let { data, form }: { data: PageData; form: ActionData } = $props();
-  let activeTab = $state<'orders' | 'products' | 'settings'>('orders');
+  // Forms post without JS enhancement, so reopen the tab that was just saved.
+  let activeTab = $state<'orders' | 'products' | 'settings'>(
+    untrack(() => (form && 'tab' in form && form.tab ? form.tab : 'orders'))
+  );
 
   function money(value: number) {
     return new Intl.NumberFormat('en-IN', {
@@ -18,6 +23,14 @@
       timeZone: 'Asia/Kolkata'
     }).format(new Date(value));
   }
+
+  const statusLabels: Record<string, string> = {
+    confirmed: 'New',
+    processing: 'Called',
+    shipped: 'Quoted',
+    delivered: 'Completed',
+    cancelled: 'Not interested'
+  };
 
   function address(order: Record<string, unknown>) {
     return [
@@ -64,14 +77,10 @@
   }
 </script>
 
-<svelte:head><title>Store admin | Raghav</title></svelte:head>
+<svelte:head><title>Store admin | Naazare Enterprises</title></svelte:head>
 
 <header class="admin-topbar">
-  <a class="brand" href="/admin"
-    ><span class="brand-mark">R</span><span
-      ><strong>Raghav admin</strong><small>Store control</small></span
-    ></a
-  >
+  <Logo href="/admin" tagline="Store admin" />
   <div>
     <a href="/" target="_blank">View website ↗</a>
     <form method="POST" action="?/logout"><button type="submit">Log out</button></form>
@@ -83,12 +92,14 @@
     <div>
       <p class="eyebrow-text">Store dashboard</p>
       <h1>Good to see you.</h1>
-      <p>Manage orders, products and business details from one place.</p>
+      <p>Manage callback requests, product frames and business details from one place.</p>
     </div>
     <div class="admin-stats">
-      <article><span>Total orders</span><strong>{data.stats.total_orders}</strong></article>
-      <article><span>Open orders</span><strong>{data.stats.open_orders}</strong></article>
-      <article><span>Order value</span><strong>{money(data.stats.total_value)}</strong></article>
+      <article><span>Total requests</span><strong>{data.stats.total_orders}</strong></article>
+      <article><span>To call back</span><strong>{data.stats.open_orders}</strong></article>
+      <article>
+        <span>Live frames</span><strong>{data.stats.live_frames} / {data.frames.length}</strong>
+      </article>
     </div>
   </section>
 
@@ -97,10 +108,10 @@
 
   <nav class="admin-tabs" aria-label="Admin sections">
     <button class:active={activeTab === 'orders'} onclick={() => (activeTab = 'orders')}
-      >Orders <span>{data.orders.length}</span></button
+      >Callback requests <span>{data.orders.length}</span></button
     >
     <button class:active={activeTab === 'products'} onclick={() => (activeTab = 'products')}
-      >Products <span>{data.products.length}</span></button
+      >Product frames <span>{data.frames.length}</span></button
     >
     <button class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}
       >Business details</button
@@ -112,9 +123,9 @@
       <div class="panel-heading">
         <div>
           <p class="eyebrow-text">Latest first</p>
-          <h2>Customer orders</h2>
+          <h2>Callback requests</h2>
         </div>
-        <p>Up to 100 recent orders are shown.</p>
+        <p>Up to 100 recent requests are shown. Call the customer, then update the status.</p>
       </div>
       {#if data.orders.length}
         <div class="orders-list">
@@ -122,10 +133,10 @@
             <article class="order-card">
               <div class="order-card-head">
                 <div>
-                  <span>Order #{order.order_number}</span><strong>{order.customer_name}</strong
+                  <span>Request #{order.order_number}</span><strong>{order.customer_name}</strong
                   ><small>{dateTime(order.created_at)}</small>
                 </div>
-                <b class={`status ${order.status}`}>{order.status}</b>
+                <b class={`status ${order.status}`}>{statusLabels[order.status] ?? order.status}</b>
               </div>
               <div class="order-details">
                 <div>
@@ -133,37 +144,49 @@
                     >{order.mobile_primary}</a
                   >
                 </div>
-                <div><span>Payment</span><strong>{order.payment_method.toUpperCase()}</strong></div>
                 <div>
-                  <span>Total</span><strong
-                    >{order.total ? money(order.total) : 'Price on call'}</strong
+                  <span>Alternate</span>{#if order.mobile_secondary}<a
+                      href={`tel:${order.mobile_secondary}`}>{order.mobile_secondary}</a
+                    >{:else}<strong>—</strong>{/if}
+                </div>
+                <div>
+                  <span>Interested in</span><strong
+                    >{order.items.map((item: { name: string }) => item.name).join(', ') ||
+                      'Not specified'}</strong
                   >
                 </div>
               </div>
               <div class="order-address">
-                <span>Delivery address</span>
-                <p>{address(order)}</p>
+                <span>Location</span>
+                <p>{address(order) || '—'}</p>
               </div>
-              <div class="order-items">
-                {#each order.items as item}<span>{item.name} × {item.quantity}</span>{/each}
-              </div>
+              {#if order.message}
+                <div class="order-address order-message">
+                  <span>Message</span>
+                  <p>{order.message}</p>
+                </div>
+              {/if}
+              {#if order.payment_method !== 'callback'}
+                <div class="order-items">
+                  <span>Older online order · {order.payment_method.toUpperCase()}</span>
+                  {#if order.total}<span>{money(order.total)}</span>{/if}
+                </div>
+              {/if}
               <form method="POST" action="?/updateOrder" class="status-form">
                 <input type="hidden" name="id" value={order.id} />
                 <label class="admin-field"
-                  ><span>Order status</span><select name="status" value={order.status}
-                    ><option value="confirmed">Confirmed</option><option value="processing"
-                      >Processing</option
-                    ><option value="shipped">Shipped</option><option value="delivered"
-                      >Delivered</option
-                    ><option value="cancelled">Cancelled</option></select
-                  ></label
+                  ><span>Status</span><select name="status" value={order.status}>
+                    {#each Object.entries(statusLabels) as [value, label]}
+                      <option {value}>{label}</option>
+                    {/each}
+                  </select></label
                 >
                 <button class="button primary" type="submit">Update</button>
                 <a
                   class="button whatsapp"
                   target="_blank"
                   rel="noreferrer"
-                  href={`https://wa.me/91${order.mobile_primary}?text=${encodeURIComponent(`Hello ${order.customer_name}, regarding your Raghav order #${order.order_number}: `)}`}
+                  href={`https://wa.me/91${order.mobile_primary}?text=${encodeURIComponent(`Hello ${order.customer_name}, this is Naazare Enterprises regarding your callback request #${order.order_number}. `)}`}
                   >WhatsApp customer</a
                 >
               </form>
@@ -173,8 +196,8 @@
       {:else}
         <div class="empty-state">
           <span>◎</span>
-          <h3>No orders yet</h3>
-          <p>New customer orders will appear here.</p>
+          <h3>No requests yet</h3>
+          <p>New callback requests from the website will appear here.</p>
         </div>
       {/if}
     </section>
@@ -182,148 +205,207 @@
     <section class="admin-panel">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow-text">Website section 2</p>
-          <h2>Edit four products</h2>
+          <p class="eyebrow-text">Website product section</p>
+          <h2>Product frames</h2>
         </div>
-        <p>Set three photos, one video, price and available quantity for each product.</p>
+        <p>
+          Each frame is a row of four products. Switch a frame on to show it on the website, below
+          the frames already live.
+        </p>
       </div>
-      <div class="admin-product-grid">
-        {#each data.products as product}
-          <form
-            method="POST"
-            action="?/updateProduct"
-            enctype="multipart/form-data"
-            class="edit-product"
-          >
-            <input type="hidden" name="id" value={product.id} />
-            <div class="product-media-admin">
-              <div>
-                <div class="edit-product-image">
-                  <img src={product.image_url} alt={`${product.name}, angle 1`} />
-                </div>
-                <span>Photo 1 · Main</span>
-              </div>
-              <div>
-                <div class="edit-product-image">
-                  <img src={product.image_2_url} alt={`${product.name}, angle 2`} />
-                </div>
-                <span>Photo 2</span>
-              </div>
-              <div>
-                <div class="edit-product-image">
-                  <img src={product.image_3_url} alt={`${product.name}, angle 3`} />
-                </div>
-                <span>Photo 3</span>
-              </div>
-              <div>
-                <div class="edit-product-image video-preview">
-                  <video src={product.product_video_url} muted playsinline preload="metadata"
-                  ></video>
-                  <b>▶</b>
-                </div>
-                <span>Video</span>
-              </div>
-            </div>
-            <div class="media-fields">
-              <label class="admin-field"
-                ><span>Photo 1 link</span><input
-                  name="image_url"
-                  value={product.image_url}
-                  required
-                /></label
+
+      <div class="frames-list">
+        {#each data.frames as frame, frameIndex}
+          <details class="frame-admin" class:live={frame.is_active} open={frameIndex === 0}>
+            <summary>
+              <span class="frame-index">{String(frameIndex + 1).padStart(2, '0')}</span>
+              <span class="frame-summary"
+                ><strong>{frame.title}</strong><small
+                  >{frame.products.length} products · order {frame.sort_order}</small
+                ></span
               >
-              <label class="upload-button"
-                ><input
-                  type="file"
-                  name="image_upload"
-                  accept="image/*"
-                  onchange={resizePhonePhoto}
-                /><span>Upload photo 1</span></label
+              <b class="frame-state">{frame.is_active ? 'Live' : 'Hidden'}</b>
+            </summary>
+
+            <form method="POST" action="?/updateFrame" class="frame-settings">
+              <input type="hidden" name="id" value={frame.id} />
+              <label class="admin-field"
+                ><span>Frame title</span><input name="title" value={frame.title} required /></label
               >
               <label class="admin-field"
-                ><span>Photo 2 link</span><input
-                  name="image_2_url"
-                  value={product.image_2_url}
-                  required
+                ><span>Short line under the title</span><input
+                  name="subtitle"
+                  value={frame.subtitle}
                 /></label
               >
-              <label class="upload-button"
-                ><input
-                  type="file"
-                  name="image_2_upload"
-                  accept="image/*"
-                  onchange={resizePhonePhoto}
-                /><span>Upload photo 2</span></label
-              >
-              <label class="admin-field"
-                ><span>Photo 3 link</span><input
-                  name="image_3_url"
-                  value={product.image_3_url}
-                  required
+              <label class="admin-field order-field"
+                ><span>Position</span><input
+                  name="sort_order"
+                  type="number"
+                  step="1"
+                  value={frame.sort_order}
                 /></label
               >
-              <label class="upload-button"
-                ><input
-                  type="file"
-                  name="image_3_upload"
-                  accept="image/*"
-                  onchange={resizePhonePhoto}
-                /><span>Upload photo 3</span></label
-              >
-              <label class="admin-field"
-                ><span>Product video link</span><input
-                  name="product_video_url"
-                  value={product.product_video_url}
-                  required
-                /></label
-              >
-              <label class="upload-button"
-                ><input type="file" name="product_video_upload" accept="video/*" /><span
-                  >Upload video (max 15 MB)</span
+              <label class="toggle switch"
+                ><input type="checkbox" name="is_active" checked={frame.is_active} /><span
+                  >Show this frame on website</span
                 ></label
               >
+              <button class="button primary" type="submit">Save frame</button>
+            </form>
+
+            <div class="admin-product-grid">
+              {#each frame.products as product}
+                <form
+                  method="POST"
+                  action="?/updateProduct"
+                  enctype="multipart/form-data"
+                  class="edit-product"
+                >
+                  <input type="hidden" name="id" value={product.id} />
+                  <div class="product-media-admin">
+                    {#each [product.image_url, product.image_2_url, product.image_3_url] as src, i}
+                      <div>
+                        <div class="edit-product-image">
+                          {#if src}<img {src} alt={`${product.name}, photo ${i + 1}`} />{/if}
+                        </div>
+                        <span>Photo {i + 1}{i === 0 ? ' · Main' : ''}</span>
+                      </div>
+                    {/each}
+                    <div>
+                      <div class="edit-product-image video-preview">
+                        {#if product.product_video_url}
+                          <video
+                            src={product.product_video_url}
+                            muted
+                            playsinline
+                            preload="metadata"
+                          ></video>
+                          <b>▶</b>
+                        {/if}
+                      </div>
+                      <span>Video</span>
+                    </div>
+                  </div>
+                  <div class="media-fields">
+                    <label class="admin-field"
+                      ><span>Photo 1 link</span><input
+                        name="image_url"
+                        value={product.image_url}
+                        required
+                      /></label
+                    >
+                    <label class="upload-button"
+                      ><input
+                        type="file"
+                        name="image_upload"
+                        accept="image/*"
+                        onchange={resizePhonePhoto}
+                      /><span>Upload photo 1</span></label
+                    >
+                    <label class="admin-field"
+                      ><span>Photo 2 link</span><input
+                        name="image_2_url"
+                        value={product.image_2_url}
+                      /></label
+                    >
+                    <label class="upload-button"
+                      ><input
+                        type="file"
+                        name="image_2_upload"
+                        accept="image/*"
+                        onchange={resizePhonePhoto}
+                      /><span>Upload photo 2</span></label
+                    >
+                    <label class="admin-field"
+                      ><span>Photo 3 link</span><input
+                        name="image_3_url"
+                        value={product.image_3_url}
+                      /></label
+                    >
+                    <label class="upload-button"
+                      ><input
+                        type="file"
+                        name="image_3_upload"
+                        accept="image/*"
+                        onchange={resizePhonePhoto}
+                      /><span>Upload photo 3</span></label
+                    >
+                    <label class="admin-field"
+                      ><span>Product video link</span><input
+                        name="product_video_url"
+                        value={product.product_video_url}
+                      /></label
+                    >
+                    <label class="upload-button"
+                      ><input type="file" name="product_video_upload" accept="video/*" /><span
+                        >Upload video (max 15 MB)</span
+                      ></label
+                    >
+                  </div>
+                  <p class="upload-help">Phone photos are resized automatically before upload.</p>
+                  <label class="admin-field"
+                    ><span>Product name</span><input
+                      name="name"
+                      value={product.name}
+                      required
+                    /></label
+                  >
+                  <label class="admin-field"
+                    ><span>Short description</span><textarea name="description" rows="2"
+                      >{product.description}</textarea
+                    ></label
+                  >
+                  <div class="two-fields">
+                    <label class="admin-field"
+                      ><span>Price ₹ (0 = ask price)</span><input
+                        name="price"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={product.price}
+                        required
+                      /></label
+                    >
+                    <label class="admin-field"
+                      ><span>Quantity</span><input
+                        name="stock"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={product.stock}
+                        required
+                      /></label
+                    >
+                  </div>
+                  <input type="hidden" name="sort_order" value={product.sort_order} />
+                  <label class="toggle"
+                    ><input type="checkbox" name="is_active" checked={product.is_active} /><span
+                      >Show this product</span
+                    ></label
+                  >
+                  <button class="button primary" type="submit">Save product</button>
+                </form>
+              {/each}
             </div>
-            <p class="upload-help">Phone photos are resized automatically before upload.</p>
-            <label class="admin-field"
-              ><span>Product name</span><input name="name" value={product.name} required /></label
-            >
-            <label class="admin-field"
-              ><span>Short description</span><textarea name="description" rows="2"
-                >{product.description}</textarea
-              ></label
-            >
-            <div class="two-fields">
-              <label class="admin-field"
-                ><span>Price ₹</span><input
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={product.price}
-                  required
-                /></label
-              >
-              <label class="admin-field"
-                ><span>Quantity</span><input
-                  name="stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={product.stock}
-                  required
-                /></label
-              >
-            </div>
-            <input type="hidden" name="sort_order" value={product.sort_order} />
-            <label class="toggle"
-              ><input type="checkbox" name="is_active" checked={product.is_active} /><span
-                >Show on website</span
-              ></label
-            >
-            <button class="button primary" type="submit">Save product</button>
-          </form>
+          </details>
         {/each}
       </div>
+
+      <form method="POST" action="?/addFrame" class="add-frame">
+        <div>
+          <h3>Add a new frame</h3>
+          <p>Creates a hidden frame with four product slots for you to fill in.</p>
+        </div>
+        <label class="admin-field"
+          ><span>Frame title</span><input
+            name="title"
+            placeholder="e.g. Vegetable cutting machines"
+            required
+          /></label
+        >
+        <button class="button primary" type="submit">Add frame</button>
+      </form>
     </section>
   {:else}
     <section class="admin-panel">
@@ -332,7 +414,7 @@
           <p class="eyebrow-text">Website contact & media</p>
           <h2>Business details</h2>
         </div>
-        <p>Update the phone, email, UPI, poster and two videos.</p>
+        <p>Update the phone numbers, email, address, hero image and the two videos.</p>
       </div>
       <form
         method="POST"
@@ -378,43 +460,22 @@
                 required
               /></label
             >
-          </div>
-        </div>
-        <div class="settings-block">
-          <h3>UPI payment</h3>
-          <div class="settings-grid">
             <label class="admin-field full"
-              ><span>UPI ID</span><input
-                name="upi_id"
-                value={data.settings.upi_id}
-                placeholder="name@bank"
+              ><span>Shop address (shown in the top bar and footer)</span><input
+                name="address"
+                value={data.settings.address}
+                placeholder="Door no, street, area, city - PIN"
               /></label
-            >
-            <label class="admin-field full"
-              ><span>QR image link</span><input
-                name="qr_url"
-                value={data.settings.qr_url}
-                placeholder="https://..."
-              /></label
-            >
-            <label class="upload-button full"
-              ><input
-                type="file"
-                name="qr_upload"
-                accept="image/*"
-                onchange={resizePhonePhoto}
-              /><span>Or upload QR image</span></label
             >
           </div>
         </div>
         <div class="settings-block">
-          <h3>Poster & videos</h3>
+          <h3>Hero image & videos</h3>
           <div class="settings-grid">
             <label class="admin-field full"
-              ><span>Poster image link</span><input
+              ><span>Hero background image link (optional)</span><input
                 name="hero_image_url"
                 value={data.settings.hero_image_url}
-                required
               /></label
             >
             <label class="upload-button full"
@@ -423,7 +484,7 @@
                 name="hero_upload"
                 accept="image/*"
                 onchange={resizePhonePhoto}
-              /><span>Upload new poster</span></label
+              /><span>Upload hero background</span></label
             >
             <label class="admin-field full"
               ><span>Video 1 link</span><input
@@ -459,7 +520,7 @@
 
 <style>
   :global(body) {
-    background: #f4f4f2;
+    background: var(--paper);
   }
   .admin-topbar {
     position: sticky;
@@ -471,8 +532,8 @@
     justify-content: space-between;
     gap: 16px;
     padding: 11px max(18px, calc((100vw - 1220px) / 2));
-    border-bottom: 1px solid #d8d8d5;
-    background: rgba(255, 255, 255, 0.94);
+    border-bottom: 1px solid var(--line);
+    background: var(--header-bg);
     backdrop-filter: blur(16px);
   }
   .admin-topbar > div {
@@ -488,7 +549,7 @@
   .admin-topbar form button {
     border: 0;
     background: transparent;
-    color: #666;
+    color: var(--muted);
     font-size: 0.78rem;
     cursor: pointer;
   }
@@ -521,9 +582,9 @@
     display: grid;
     gap: 7px;
     padding: 15px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 15px;
-    background: white;
+    background: var(--white);
   }
   .admin-stats span {
     color: var(--muted);
@@ -543,12 +604,12 @@
     font-weight: 750;
   }
   .admin-notice.success {
-    background: #e7e7e5;
-    color: #111;
+    background: var(--success-tint);
+    color: var(--success);
   }
   .admin-notice.error {
-    background: #d0d0cd;
-    color: #111;
+    background: var(--danger-tint);
+    color: var(--danger);
   }
   .admin-tabs {
     display: flex;
@@ -556,9 +617,9 @@
     overflow-x: auto;
     margin-bottom: 14px;
     padding: 5px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 15px;
-    background: white;
+    background: var(--white);
     scrollbar-width: none;
   }
   .admin-tabs button {
@@ -571,14 +632,14 @@
     border: 0;
     border-radius: 11px;
     background: transparent;
-    color: #555;
+    color: var(--muted);
     font-size: 0.82rem;
     font-weight: 800;
     cursor: pointer;
   }
   .admin-tabs button.active {
     background: var(--blue);
-    color: white;
+    color: var(--white);
   }
   .admin-tabs span {
     display: grid;
@@ -586,14 +647,14 @@
     height: 21px;
     place-items: center;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.2);
     font-size: 0.65rem;
   }
   .admin-panel {
     padding: 22px 16px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 21px;
-    background: white;
+    background: var(--white);
   }
   .panel-heading {
     display: grid;
@@ -616,9 +677,9 @@
   }
   .order-card {
     padding: 16px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 16px;
-    background: #fafafa;
+    background: var(--surface);
   }
   .order-card-head {
     display: flex;
@@ -645,30 +706,30 @@
     height: fit-content;
     padding: 6px 9px;
     border-radius: 999px;
-    background: #e5e5e3;
-    color: #333;
+    background: var(--line);
+    color: var(--ink);
     font-size: 0.62rem;
     text-transform: uppercase;
   }
   .status.confirmed {
-    background: #ededeb;
-    color: #111;
+    background: var(--accent-tint);
+    color: var(--accent-ink);
   }
   .status.processing {
-    background: #dededb;
-    color: #111;
+    background: var(--brand-tint);
+    color: var(--brand);
   }
   .status.shipped {
-    background: #d2d2cf;
-    color: #111;
+    background: var(--soft);
+    color: var(--ink);
   }
   .status.delivered {
-    background: #c5c5c1;
-    color: #111;
+    background: var(--success-tint);
+    color: var(--success);
   }
   .status.cancelled {
-    background: #b9b9b5;
-    color: #111;
+    background: var(--danger-tint);
+    color: var(--danger);
   }
   .order-details {
     display: grid;
@@ -681,7 +742,7 @@
     gap: 3px;
     padding: 10px;
     border-radius: 10px;
-    background: white;
+    background: var(--white);
   }
   .order-details span,
   .order-address span {
@@ -698,11 +759,11 @@
   .order-address {
     padding: 12px;
     border-radius: 10px;
-    background: white;
+    background: var(--white);
   }
   .order-address p {
     margin: 5px 0 0;
-    color: #444;
+    color: var(--muted);
     font-size: 0.78rem;
     line-height: 1.45;
   }
@@ -734,7 +795,7 @@
     text-align: center;
   }
   .empty-state > span {
-    color: #aaa;
+    color: var(--line-strong);
     font-size: 3rem;
   }
   .empty-state h3 {
@@ -752,15 +813,15 @@
     display: grid;
     gap: 13px;
     padding: 14px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 16px;
-    background: #fafafa;
+    background: var(--surface);
   }
   .edit-product-image {
     overflow: hidden;
     aspect-ratio: 1;
     border-radius: 13px;
-    background: #eee;
+    background: var(--soft);
   }
   .edit-product-image img,
   .edit-product-image video {
@@ -794,8 +855,8 @@
     height: 28px;
     place-items: center;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.75);
-    color: white;
+    background: var(--scrim);
+    color: var(--white);
     font-size: 0.62rem;
     transform: translate(-50%, -50%);
   }
@@ -815,7 +876,7 @@
     min-height: 44px;
     place-items: center;
     overflow: hidden;
-    border: 1px dashed #888;
+    border: 1px dashed var(--muted);
     border-radius: 11px;
     background: var(--sky);
     color: var(--blue);
@@ -842,7 +903,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #444;
+    color: var(--muted);
     font-size: 0.76rem;
     font-weight: 750;
   }
@@ -857,9 +918,9 @@
   }
   .settings-block {
     padding: 18px;
-    border: 1px solid #d8d8d5;
+    border: 1px solid var(--line);
     border-radius: 16px;
-    background: #fafafa;
+    background: var(--surface);
   }
   .settings-block h3 {
     margin: 0 0 16px;
@@ -867,6 +928,98 @@
   }
   .settings-save {
     width: 100%;
+  }
+  .order-message {
+    margin-top: 8px;
+  }
+  .frames-list {
+    display: grid;
+    gap: 12px;
+  }
+  .frame-admin {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--white);
+  }
+  .frame-admin[open] {
+    background: var(--surface);
+  }
+  .frame-admin summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .frame-admin summary::-webkit-details-marker {
+    display: none;
+  }
+  .frame-index {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1.5px solid var(--ink);
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+  .frame-summary {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+  .frame-summary strong {
+    font-size: 1rem;
+  }
+  .frame-summary small {
+    color: var(--muted);
+    font-size: 0.72rem;
+  }
+  .frame-state {
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--soft);
+    color: var(--muted);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+  }
+  .frame-admin.live .frame-state {
+    background: var(--ink);
+    color: var(--white);
+  }
+  .frame-settings {
+    display: grid;
+    gap: 12px;
+    margin: 0 16px 16px;
+    padding: 16px;
+    border-radius: 14px;
+    background: var(--paper);
+  }
+  .frame-admin .admin-product-grid {
+    padding: 0 16px 16px;
+  }
+  .switch {
+    min-height: 48px;
+  }
+  .add-frame {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 16px;
+  }
+  .add-frame h3 {
+    margin: 0 0 4px;
+  }
+  .add-frame p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
   }
   :global(.admin-field textarea) {
     resize: vertical;
@@ -889,6 +1042,18 @@
     .admin-product-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+    .frame-settings {
+      grid-template-columns: 1fr 1.4fr 110px;
+      align-items: end;
+    }
+    .frame-settings .switch,
+    .frame-settings .button {
+      grid-column: span 1;
+    }
+    .add-frame {
+      grid-template-columns: 1fr 1.2fr auto;
+      align-items: end;
+    }
     .admin-panel {
       padding: 28px;
     }
@@ -899,7 +1064,7 @@
     }
   }
   @media (max-width: 520px) {
-    .admin-topbar .brand small,
+    .admin-topbar :global(.brand small),
     .admin-topbar > div > a {
       display: none;
     }

@@ -1,20 +1,18 @@
 <script lang="ts">
+  import Logo from '../../../lib/components/Logo.svelte';
   import type { ActionData } from './$types';
   let { form }: { form: ActionData } = $props();
 </script>
 
-<svelte:head><title>Admin sign in | Raghav</title></svelte:head>
+<svelte:head><title>Admin sign in | Naazare Enterprises</title></svelte:head>
 
 <main class="login-shell">
   <section class="login-card">
-    <a class="brand" href="/">
-      <span class="brand-mark">R</span>
-      <span><strong>Raghav admin</strong><small>Store control</small></span>
-    </a>
+    <Logo tagline="Store admin" />
     <div class="login-copy">
       <p class="eyebrow-text">Private access</p>
       <h1>Welcome back.</h1>
-      <p>Sign in to edit products, contact details and view orders.</p>
+      <p>Sign in to manage callback requests, product frames and business details.</p>
     </div>
     <form method="POST">
       <label class="admin-field"
@@ -47,14 +45,14 @@
     place-items: center;
     padding: 24px;
     background:
-      radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 34%), #0a0a0a;
+      radial-gradient(circle at top right, rgba(226, 184, 79, 0.18), transparent 40%), var(--deep);
   }
   .login-card {
     width: min(100%, 440px);
     padding: 28px;
     border-radius: 26px;
-    background: white;
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
   }
   .login-copy {
     margin: 48px 0 24px;
@@ -62,8 +60,9 @@
   h1 {
     margin: 8px 0 10px;
     color: var(--navy);
+    font-family: var(--display);
     font-size: 3rem;
-    letter-spacing: -0.06em;
+    line-height: 1;
   }
   .login-copy > p:last-child {
     color: var(--muted);

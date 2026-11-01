@@ -1,5 +1,6 @@
 export type Product = {
   id: number;
+  frame_id: number;
   name: string;
   description: string;
   price: number;
@@ -12,14 +13,23 @@ export type Product = {
   sort_order: number;
 };
 
+export type Frame = {
+  id: number;
+  title: string;
+  subtitle: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type FrameWithProducts = Frame & { products: Product[] };
+
 export type SiteSettings = {
   business_name: string;
   phone: string;
   secondary_phone: string;
   email: string;
   whatsapp: string;
-  upi_id: string;
-  qr_url: string;
+  address: string;
   hero_image_url: string;
   video_1_url: string;
   video_2_url: string;

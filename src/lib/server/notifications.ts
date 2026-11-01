@@ -1,21 +1,23 @@
-type NotificationOrder = {
-  orderNumber: string;
+type CallbackRequest = {
+  requestNumber: string;
   customerName: string;
   mobile: string;
-  address: string;
-  payment: string;
-  total: number;
+  location: string;
+  product: string;
+  message: string;
 };
 
-function message(order: NotificationOrder) {
+function message(request: CallbackRequest) {
   return [
-    `New order #${order.orderNumber}`,
-    `Customer: ${order.customerName}`,
-    `Mobile: ${order.mobile}`,
-    `Address: ${order.address}`,
-    `Payment: ${order.payment.toUpperCase()}`,
-    `Total: ₹${order.total.toFixed(2)}`
-  ].join('\n');
+    `New callback request #${request.requestNumber}`,
+    `Customer: ${request.customerName}`,
+    `Mobile: ${request.mobile}`,
+    `Location: ${request.location}`,
+    `Interested in: ${request.product}`,
+    request.message && `Note: ${request.message}`
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function sendTwilio(to: string, from: string, body: string) {
@@ -36,10 +38,10 @@ async function sendTwilio(to: string, from: string, body: string) {
 }
 
 export async function notifyOwner(
-  order: NotificationOrder,
+  request: CallbackRequest,
   owner: { phone: string; whatsapp: string; email: string }
 ) {
-  const body = message(order);
+  const body = message(request);
   const results: Record<string, string> = {
     whatsapp: 'not_configured',
     sms: 'not_configured',
@@ -78,7 +80,7 @@ export async function notifyOwner(
         body: JSON.stringify({
           from: EMAIL_FROM,
           to: owner.email,
-          subject: `New order #${order.orderNumber}`,
+          subject: `Callback request #${request.requestNumber}`,
           text: body
         })
       });
@@ -93,7 +95,7 @@ export async function notifyOwner(
       const response = await fetch(ORDER_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...order, message: body })
+        body: JSON.stringify({ ...request, summary: body })
       });
       results.webhook = response.ok ? 'sent' : `failed_${response.status}`;
     } catch {

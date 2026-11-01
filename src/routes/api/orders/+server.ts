@@ -4,129 +4,78 @@ import { dbQuery } from '../../../lib/server/db';
 import { notifyOwner } from '../../../lib/server/notifications';
 import type { RequestHandler } from './$types';
 
-type IncomingItem = { id: number; quantity: number };
-
-const requiredFields = [
-  'customer_name',
-  'mobile_primary',
-  'pincode',
-  'state',
-  'district',
-  'city',
-  'locality'
-] as const;
-
+// Callback requests: we store who to call and what they are interested in.
+// No payment is taken online; the team calls the customer back.
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = await request.json();
+    const text = (name: string, max = 200) =>
+      String(body[name] ?? '')
+        .trim()
+        .slice(0, max);
 
-    for (const field of requiredFields) {
-      if (!String(body[field] || '').trim()) {
-        return json({ error: `Please enter ${field.replaceAll('_', ' ')}` }, { status: 400 });
-      }
-    }
+    const customerName = text('customer_name', 120);
+    if (!customerName) return json({ error: 'Please enter your name' }, { status: 400 });
 
-    const phone = String(body.mobile_primary).replace(/\D/g, '');
+    const phone = text('mobile_primary').replace(/\D/g, '').slice(-10);
     if (phone.length !== 10)
       return json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 });
-    if (!/^\d{6}$/.test(String(body.pincode))) {
+
+    const city = text('city', 120);
+    if (!city) return json({ error: 'Please enter your town or city' }, { status: 400 });
+
+    const pincode = text('pincode', 6);
+    if (pincode && !/^\d{6}$/.test(pincode)) {
       return json({ error: 'Enter a valid 6-digit PIN code' }, { status: 400 });
     }
-    if (!['cod', 'upi'].includes(body.payment_method)) {
-      return json({ error: 'Choose a payment method' }, { status: 400 });
+
+    let items: { id: number; name: string; price: number; quantity: number }[] = [];
+    const productId = Number(body.product_id);
+    if (Number.isInteger(productId) && productId > 0) {
+      const product = await dbQuery<{ id: number; name: string; price: number }>(
+        'SELECT id, name, price::float8 AS price FROM products WHERE is_active = TRUE AND id = $1',
+        [productId]
+      );
+      if (product.rows[0]) items = [{ ...product.rows[0], quantity: 1 }];
     }
 
-    const incoming: IncomingItem[] = Array.isArray(body.items) ? body.items : [];
-    const wanted = incoming
-      .map((item) => ({
-        id: Number(item.id),
-        quantity: Math.max(0, Math.min(99, Number(item.quantity)))
-      }))
-      .filter(
-        (item) => Number.isInteger(item.id) && Number.isInteger(item.quantity) && item.quantity > 0
-      );
-    if (!wanted.length) return json({ error: 'Choose at least one product' }, { status: 400 });
-
-    const productResult = await dbQuery<{
-      id: number;
-      name: string;
-      price: number;
-      stock: number;
-    }>(
-      'SELECT id, name, price::float8 AS price, stock FROM products WHERE is_active = TRUE AND id = ANY($1::int[])',
-      [wanted.map((item) => item.id)]
-    );
-
-    const items = wanted.map((wantedItem) => {
-      const product = productResult.rows.find((row) => row.id === wantedItem.id);
-      if (!product) throw new Error('A selected product is no longer available');
-      if (wantedItem.quantity > product.stock)
-        throw new Error(`${product.name} has only ${product.stock} available`);
-      return {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        quantity: wantedItem.quantity
-      };
-    });
-    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const secondary = text('mobile_secondary').replace(/\D/g, '').slice(-10);
+    const message = text('message', 1000);
+    const shopName = text('shop_name', 120);
+    const state = text('state', 80);
     const id = randomUUID();
 
     const order = await dbQuery<{ order_number: string }>(
       `INSERT INTO orders (
         id, customer_name, mobile_primary, mobile_secondary, pincode, state, district, city,
-        locality, road, landmark, shop_name, payment_method, items, total
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15)
+        locality, shop_name, payment_method, items, total, message
+      ) VALUES ($1,$2,$3,$4,$5,$6,'',$7,'',$8,'callback',$9::jsonb,0,$10)
       RETURNING order_number::text`,
       [
         id,
-        String(body.customer_name).trim(),
+        customerName,
         phone,
-        String(body.mobile_secondary || '').replace(/\D/g, ''),
-        String(body.pincode).trim(),
-        String(body.state).trim(),
-        String(body.district).trim(),
-        String(body.city).trim(),
-        String(body.locality).trim(),
-        String(body.road || '').trim(),
-        String(body.landmark || '').trim(),
-        String(body.shop_name || '').trim(),
-        body.payment_method,
+        secondary,
+        pincode,
+        state,
+        city,
+        shopName,
         JSON.stringify(items),
-        total
+        message
       ]
     );
-
-    for (const item of items) {
-      await dbQuery(
-        'UPDATE products SET stock = GREATEST(0, stock - $1), updated_at = NOW() WHERE id = $2',
-        [item.quantity, item.id]
-      );
-    }
 
     const settings = await dbQuery<{ phone: string; whatsapp: string; email: string }>(
       'SELECT phone, whatsapp, email FROM site_settings WHERE id = 1'
     );
-    const address = [
-      body.shop_name,
-      body.locality,
-      body.road,
-      body.landmark,
-      body.city,
-      body.district,
-      body.state,
-      body.pincode
-    ]
-      .filter(Boolean)
-      .join(', ');
     const notifications = await notifyOwner(
       {
-        orderNumber: order.rows[0].order_number,
-        customerName: String(body.customer_name).trim(),
+        requestNumber: order.rows[0].order_number,
+        customerName,
         mobile: phone,
-        address,
-        payment: body.payment_method,
-        total
+        location: [shopName, city, state, pincode].filter(Boolean).join(', '),
+        product: items[0]?.name ?? 'Not specified',
+        message
       },
       settings.rows[0]
     );
@@ -135,10 +84,12 @@ export const POST: RequestHandler = async ({ request }) => {
       id
     ]);
 
-    return json({ ok: true, orderNumber: order.rows[0].order_number, total });
+    return json({ ok: true, requestNumber: order.rows[0].order_number });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Could not place your order';
-    console.error('Order failed', error);
-    return json({ error: message }, { status: 500 });
+    console.error('Callback request failed', error);
+    return json(
+      { error: 'Could not send your request. Please call or WhatsApp us instead.' },
+      { status: 500 }
+    );
   }
 };
