@@ -43,13 +43,16 @@ export const POST: RequestHandler = async ({ request }) => {
     const message = text('message', 1000);
     const shopName = text('shop_name', 120);
     const state = text('state', 80);
+    const road = text('road', 200);
+    const district = text('district', 80);
+    const landmark = text('landmark', 200);
     const id = randomUUID();
 
     const order = await dbQuery<{ order_number: string }>(
       `INSERT INTO orders (
         id, customer_name, mobile_primary, mobile_secondary, pincode, state, district, city,
-        locality, shop_name, payment_method, items, total, message
-      ) VALUES ($1,$2,$3,$4,$5,$6,'',$7,'',$8,'callback',$9::jsonb,0,$10)
+        locality, road, landmark, shop_name, payment_method, items, total, message
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'',$9,$10,$11,'callback',$12::jsonb,0,$13)
       RETURNING order_number::text`,
       [
         id,
@@ -58,7 +61,10 @@ export const POST: RequestHandler = async ({ request }) => {
         secondary,
         pincode,
         state,
+        district,
         city,
+        road,
+        landmark,
         shopName,
         JSON.stringify(items),
         message
@@ -73,7 +79,9 @@ export const POST: RequestHandler = async ({ request }) => {
         requestNumber: order.rows[0].order_number,
         customerName,
         mobile: phone,
-        location: [shopName, city, state, pincode].filter(Boolean).join(', '),
+        location: [shopName, road, landmark && `near ${landmark}`, city, district, state, pincode]
+          .filter(Boolean)
+          .join(', '),
         product: items[0]?.name ?? 'Not specified',
         message
       },

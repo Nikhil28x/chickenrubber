@@ -165,8 +165,7 @@ p {
   text-align: center;
 }
 .section-heading h2,
-.about-copy h2,
-.callback-intro h2 {
+.about-copy h2 {
   margin: 0 0 14px;
   font-family: var(--display);
   font-size: clamp(2.1rem, 5.5vw, 3.2rem);
@@ -696,12 +695,6 @@ a.infobar-item:hover {
   font-style: italic;
   font-weight: 500;
 }
-.direct-contact > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
 /* ---------- Products ---------- */
 
 .products {
@@ -1123,60 +1116,7 @@ a.infobar-item:hover {
   background: var(--surface);
 }
 .callback {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 64px;
-  align-items: start;
-}
-.callback-intro > p:not(.eyebrow-text) {
-  color: var(--muted);
-  font-size: 1.05rem;
-}
-.steps {
-  display: grid;
-  gap: 18px;
-  margin: 30px 0 34px;
-  padding: 0;
-  list-style: none;
-  counter-reset: step;
-}
-.steps li {
-  display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 2px 14px;
-  counter-increment: step;
-}
-.steps li::before {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  grid-row: span 2;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--brand-tint);
-  color: var(--brand-deep);
-  font-family: var(--display);
-  font-size: 1.1rem;
-  font-weight: 800;
-  content: counter(step);
-}
-.steps strong {
-  font-size: 1rem;
-}
-.steps span {
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-.direct-contact {
-  display: grid;
-  gap: 12px;
-  padding-top: 26px;
-  border-top: 1px solid var(--line);
-}
-.direct-contact > span {
-  color: var(--muted);
-  font-size: 0.88rem;
-  font-weight: 600;
+  max-width: 760px;
 }
 .callback-card {
   padding: 32px;
@@ -1420,8 +1360,7 @@ a.infobar-item:hover {
   .topbar-inner {
     min-height: 72px;
   }
-  .about,
-  .callback {
+  .about {
     grid-template-columns: 1fr;
     gap: 44px;
   }

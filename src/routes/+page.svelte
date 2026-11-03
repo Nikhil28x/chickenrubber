@@ -27,7 +27,10 @@
     customer_name: '',
     mobile_primary: '',
     mobile_secondary: '',
+    road: '',
+    district: '',
     city: '',
+    landmark: '',
     state: '',
     pincode: '',
     shop_name: '',
@@ -390,33 +393,8 @@
 
   <section class="section callback-section" id="callback">
     <div class="container callback">
-      <div class="callback-intro">
-        <p class="eyebrow-text">Request a callback</p>
-        <h2>Tell us what you need. We’ll call you back.</h2>
-        <p>
-          Share your details and the product you are interested in. Our team will call you with the
-          price, availability and delivery options.
-        </p>
-        <ol class="steps">
-          <li><strong>Share your details</strong><span>Takes less than a minute.</span></li>
-          <li>
-            <strong>We call you back</strong><span>During working hours, usually same day.</span>
-          </li>
-          <li>
-            <strong>Confirm and receive</strong><span>Price, delivery and support sorted.</span>
-          </li>
-        </ol>
-        <div class="direct-contact">
-          <span>Prefer to talk now?</span>
-          <div>
-            <a class="button primary" href={`tel:${phone}`}
-              ><Icon name="phone" size={18} />Call us · {phoneLabel}</a
-            >
-            <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
-              ><Icon name="whatsapp" size={19} />WhatsApp</a
-            >
-          </div>
-        </div>
+      <div class="section-heading centered">
+        <h2>Contact us</h2>
       </div>
       <div class="callback-card">
         {#if requestNumber}
@@ -469,11 +447,25 @@
                   maxlength="10"
                 /></label
               >
+              <label class="full"
+                ><span>Street / area / locality</span><input
+                  bind:value={form.road}
+                  autocomplete="street-address"
+                  placeholder="Door no., street, area"
+                /></label
+              >
+              <label><span>District</span><input bind:value={form.district} /></label>
               <label
                 ><span>Town / city *</span><input
                   bind:value={form.city}
                   required
                   autocomplete="address-level2"
+                /></label
+              >
+              <label class="full"
+                ><span>Landmark</span><input
+                  bind:value={form.landmark}
+                  placeholder="Near temple, bus stop, school…"
                 /></label
               >
               <label
@@ -558,7 +550,7 @@
         <li><a href="#about">About us</a></li>
         <li><a href="#products">Products</a></li>
         <li><a href="#videos">Videos</a></li>
-        <li><a href="#callback">Request a callback</a></li>
+        <li><a href="#callback">Contact us</a></li>
       </ul>
     </div>
     <div>

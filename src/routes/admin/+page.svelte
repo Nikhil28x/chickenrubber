@@ -37,7 +37,7 @@
       order.shop_name,
       order.locality,
       order.road,
-      order.landmark,
+      order.landmark && `Near ${order.landmark}`,
       order.city,
       order.district,
       order.state,

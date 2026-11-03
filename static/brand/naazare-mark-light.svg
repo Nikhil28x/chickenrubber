@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Naazare Enterprises">
   <path d="M32 3 57.5 17.5v29L32 61 6.5 46.5v-29Z" fill="#EEECE5" stroke="#EEECE5" stroke-width="4" stroke-linejoin="round"/>
   <path d="M32 9.5 52 21v22L32 54.5 12 43V21Z" fill="none" stroke="#4D6A4E" stroke-width="1.6" stroke-linejoin="round" opacity=".55"/>
-  <path d="M21 20.5h6.5v23H21zM36.5 20.5H43v23h-6.5z" fill="#4D6A4E"/>
-  <path d="M21 20.5h6.5L43 43.5h-6.5Z" fill="#E2B84F"/>
+  <path d="M15 20.5h5v23h-5zM27 20.5h5v23h-5zM36 20.5h5v23h-5zM36 20.5h13v4.5H36zM36 39h13v4.5H36z" fill="#4D6A4E"/>
+  <path d="M15 20.5h5l12 23h-5ZM41 29.75h6v4.5h-6z" fill="#E2B84F"/>
 </svg>
