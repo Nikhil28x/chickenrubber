@@ -237,7 +237,10 @@
             commercial kitchens.
           </p>
           {@render cashOnDelivery('Cash on delivery across India', true)}
-          {@render contactActions()}
+          <div class="hero-actions">
+            <a class="button shop" href="#products">Shop now <Icon name="arrow" size={18} /></a>
+            {@render contactActions()}
+          </div>
         </div>
         <div class="seal" aria-label={`${yearsInTrade} years of trust`}>
           <span class="seal-since">Since 2004</span>
@@ -299,23 +302,14 @@
   <section class="section products" id="products">
     <div class="container">
       <div class="section-heading centered">
-        <p class="eyebrow-text">Our products</p>
-        <h2>Browse by range</h2>
-        <p>Tap any product to see photos and video. Call us for the latest price.</p>
+        <h2>Our products</h2>
       </div>
 
       {#each data.frames as frame, frameIndex}
         <div class="frame" id={`frame-${frame.id}`}>
-          <div class="frame-head">
-            <span class="frame-number">{String(frameIndex + 1).padStart(2, '0')}</span>
-            <div class="frame-title">
-              <h3>{frame.title}</h3>
-              {#if frame.subtitle}<p>{frame.subtitle}</p>{/if}
-            </div>
-            <a class="frame-enquire" href={`tel:${phone}`}
-              ><Icon name="phone" size={16} />Call us about this range</a
-            >
-          </div>
+          {#if data.frames.length > 1}
+            <h3 class="frame-title">{frame.title}</h3>
+          {/if}
           <div class="product-grid">
             {#each frame.products as product, index}
               <article class="product-card">

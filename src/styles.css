@@ -478,6 +478,22 @@ a.infobar-item:hover {
   flex-wrap: wrap;
   gap: 12px;
 }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.button.shop {
+  min-height: 52px;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--white);
+  font-size: 1rem;
+}
+.button.shop:hover {
+  border-color: var(--ink-soft);
+  background: var(--ink-soft);
+}
 .contact-actions .button {
   min-height: 52px;
   font-size: 1rem;
@@ -694,58 +710,13 @@ a.infobar-item:hover {
 .frame + .frame {
   margin-top: 64px;
 }
-.frame-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 22px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
-}
-.frame-number {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: var(--brand);
-  color: var(--white);
-  font-family: var(--display);
-  font-size: 1.4rem;
-  font-weight: 800;
-}
+/* Range names only show once more than one frame is live. */
 .frame-title {
-  min-width: 0;
-  flex: 1;
-}
-.frame-title h3 {
-  margin: 0;
+  margin: 0 0 18px;
   font-family: var(--display);
   font-size: clamp(1.45rem, 3vw, 1.9rem);
   font-weight: 700;
   line-height: 1.1;
-}
-.frame-title p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-.frame-enquire {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0;
-  border: 0;
-  background: transparent;
-  color: var(--brand);
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.frame-enquire:hover {
-  color: var(--brand-deep);
 }
 .product-grid {
   display: grid;
@@ -1534,6 +1505,12 @@ a.infobar-item:hover {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
+  .hero-actions {
+    gap: 10px;
+  }
+  .hero-actions > * {
+    flex: 1 1 100%;
+  }
   .hero-band-inner {
     flex-direction: column;
     align-items: flex-start;
@@ -1589,18 +1566,6 @@ a.infobar-item:hover {
   .view-media {
     right: 8px;
     bottom: 8px;
-  }
-  .frame-head {
-    flex-wrap: wrap;
-  }
-  .frame-number {
-    width: 44px;
-    height: 44px;
-  }
-  .frame-enquire {
-    width: 100%;
-    justify-content: flex-start;
-    padding: 0;
   }
   .video-grid {
     grid-template-columns: 1fr;
