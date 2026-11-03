@@ -36,7 +36,6 @@
   });
 
   const allProducts = $derived(data.frames.flatMap((frame) => frame.products));
-  const heroProducts = $derived(allProducts.slice(0, 4));
   const aboutImages = $derived([allProducts[0]?.image_url, allProducts[1]?.image_url]);
   const phone = $derived(data.settings.phone);
   const phoneLabel = $derived(formatPhone(phone));
@@ -246,24 +245,6 @@
           <span class="seal-label">Years of trust</span>
         </div>
       </div>
-
-      {#if heroProducts.length}
-        <div class="lineup" aria-label="Featured products">
-          {#each heroProducts as product, index}
-            <button
-              type="button"
-              class="lineup-item"
-              onclick={() => openProduct(product)}
-              aria-label={`View ${product.name}`}
-            >
-              <span class="lineup-image"
-                ><img src={product.image_url} alt="" loading={index > 1 ? 'lazy' : 'eager'} /></span
-              >
-              <span class="lineup-name">{product.name}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
     </div>
     <div class="hero-band">
       <div class="container hero-band-inner">

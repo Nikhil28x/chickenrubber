@@ -520,47 +520,6 @@ a.infobar-item:hover {
 .seal-label {
   margin-top: 4px;
 }
-.lineup {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
-  margin-top: 52px;
-}
-.lineup-item {
-  display: grid;
-  gap: 12px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  text-align: center;
-  cursor: pointer;
-}
-.lineup-image {
-  display: block;
-  overflow: hidden;
-  aspect-ratio: 4 / 3;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--white);
-  box-shadow: var(--shadow);
-  transition:
-    transform 200ms ease,
-    box-shadow 200ms ease;
-}
-.lineup-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.lineup-item:hover .lineup-image {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-4px);
-}
-.lineup-name {
-  font-size: 0.95rem;
-  font-weight: 700;
-}
 .hero-band {
   background: var(--brand);
   color: var(--white);
@@ -1498,8 +1457,7 @@ a.infobar-item:hover {
   .about-media {
     max-width: 560px;
   }
-  .product-grid,
-  .lineup {
+  .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stats-inner {
@@ -1575,13 +1533,6 @@ a.infobar-item:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
-  }
-  .lineup {
-    gap: 12px;
-    margin-top: 36px;
-  }
-  .lineup-name {
-    font-size: 0.85rem;
   }
   .hero-band-inner {
     flex-direction: column;
