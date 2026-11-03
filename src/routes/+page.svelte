@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../lib/components/Icon.svelte';
   import Logo from '../lib/components/Logo.svelte';
+  import { INSTAGRAM_URL, YOUTUBE_URL } from '../lib/social';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
 
@@ -43,9 +44,7 @@
     [phone, data.settings.secondary_phone].filter(Boolean).map(formatPhone).join('  ·  ')
   );
   const whatsappNumber = $derived(data.settings.whatsapp.replace(/\D/g, '').slice(-10));
-  const whatsappHref = $derived(
-    `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent('Hello Naazare Enterprises, I would like to know more about your products.')}`
-  );
+  const whatsappHref = $derived(whatsappLink());
 
   $effect(() => {
     if (typeof document === 'undefined') return;
@@ -71,6 +70,19 @@
     return `${photos} photo${photos === 1 ? '' : 's'}${video}`;
   }
 
+  function whatsappLink(product?: Product) {
+    const message = product
+      ? `Hello Naazare Enterprises, I am interested in ${product.name}. Please share the price.`
+      : 'Hello Naazare Enterprises, I would like to know more about your products.';
+    return `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent(message)}`;
+  }
+
+  function showMedia(step: number) {
+    if (!activeProduct) return;
+    const count = productMedia(activeProduct).length;
+    activeMediaIndex = (activeMediaIndex + step + count) % count;
+  }
+
   function openProduct(product: Product) {
     activeProduct = product;
     activeMediaIndex = 0;
@@ -82,17 +94,10 @@
   }
 
   function handleGalleryKey(event: KeyboardEvent) {
-    if (event.key === 'Escape' && activeProduct) closeProduct();
-  }
-
-  function requestCallback(product?: Product) {
-    if (product) form.product_id = String(product.id);
-    closeProduct();
-    requestNumber = '';
-    setTimeout(() => {
-      document.getElementById('callback')?.scrollIntoView({ behavior: 'smooth' });
-      document.getElementById('customer-name')?.focus({ preventScroll: true });
-    }, 50);
+    if (!activeProduct) return;
+    if (event.key === 'Escape') closeProduct();
+    if (event.key === 'ArrowRight') showMedia(1);
+    if (event.key === 'ArrowLeft') showMedia(-1);
   }
 
   async function submitRequest(event: SubmitEvent) {
@@ -132,6 +137,19 @@
 
 <svelte:window onkeydown={handleGalleryKey} />
 
+{#snippet contactActions(product?: Product)}
+  <div class="contact-actions">
+    <a class="button primary" href={`tel:${phone}`}><Icon name="phone" size={18} />Call us</a>
+    <a class="button whatsapp" href={whatsappLink(product)} target="_blank" rel="noreferrer"
+      ><Icon name="whatsapp" size={19} />WhatsApp</a
+    >
+  </div>
+{/snippet}
+
+{#snippet cashOnDelivery(label = 'Cash on delivery', large = false)}
+  <span class="cod" class:large><Icon name="check" size={large ? 20 : 15} />{label}</span>
+{/snippet}
+
 <svelte:head>
   <title>{data.settings.business_name} | Commercial Kitchen Equipment Since 2004</title>
   <meta
@@ -144,20 +162,36 @@
   <div class="container infobar-inner">
     <div class="infobar-details">
       <span class="infobar-item infobar-address"
-        ><Icon name="pin" size={15} />{data.settings.address ||
+        ><Icon name="pin" size={18} />{data.settings.address ||
           'Dealers in commercial kitchen equipment since 2004'}</span
       >
-      <a class="infobar-item" href={`tel:${phone}`}><Icon name="phone" size={15} />{phoneLabel}</a>
+      <a class="infobar-item infobar-phone" href={`tel:${phone}`}
+        ><Icon name="phone" size={18} />{phoneLabel}</a
+      >
       <a class="infobar-item infobar-email" href={`mailto:${data.settings.email}`}
-        ><Icon name="mail" size={15} />{data.settings.email}</a
+        ><Icon name="mail" size={18} />{data.settings.email}</a
       >
     </div>
     <div class="infobar-social">
       <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp"
-        ><Icon name="whatsapp" size={16} /></a
+        ><Icon name="whatsapp" size={22} /></a
       >
-      <a href={`tel:${phone}`} aria-label="Call"><Icon name="phone" size={15} /></a>
-      <a href={`mailto:${data.settings.email}`} aria-label="Email"><Icon name="mail" size={15} /></a
+      <a href={`tel:${phone}`} aria-label="Call"><Icon name="phone" size={20} /></a>
+      <a href={`mailto:${data.settings.email}`} aria-label="Email"><Icon name="mail" size={20} /></a
+      >
+      <a
+        class="social-extra"
+        href={YOUTUBE_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="YouTube"><Icon name="youtube" size={22} /></a
+      >
+      <a
+        class="social-extra"
+        href={INSTAGRAM_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Instagram"><Icon name="instagram" size={20} /></a
       >
     </div>
   </div>
@@ -203,14 +237,8 @@
             Dependable machines and genuine spare parts for poultry shops, hotels, bakeries and
             commercial kitchens.
           </p>
-          <div class="hero-actions">
-            <button class="button primary" type="button" onclick={() => requestCallback()}
-              >Request a callback <Icon name="arrow" size={16} /></button
-            >
-            <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
-              ><Icon name="whatsapp" size={18} />WhatsApp us</a
-            >
-          </div>
+          {@render cashOnDelivery('Cash on delivery across India', true)}
+          {@render contactActions()}
         </div>
         <div class="seal" aria-label={`${yearsInTrade} years of trust`}>
           <span class="seal-since">Since 2004</span>
@@ -240,7 +268,8 @@
     <div class="hero-band">
       <div class="container hero-band-inner">
         <span
-          ><Icon name="truck" size={18} />{data.settings.address || 'Delivery across India'}</span
+          ><Icon name="truck" size={18} />{data.settings.address ||
+            'Delivery across India · Cash on delivery'}</span
         >
         <a href={`tel:${phone}`}><Icon name="phone" size={16} />{allPhones}</a>
       </div>
@@ -252,7 +281,7 @@
       <div><strong>2004</strong><span>Established and trusted by kitchens</span></div>
       <div><strong>{yearsInTrade}+</strong><span>Years of experience in the trade</span></div>
       <div><strong>{productLines.length}+</strong><span>Product lines and growing</span></div>
-      <div><strong>India</strong><span>Delivery to your doorstep</span></div>
+      <div><strong>COD</strong><span>Cash on delivery to your doorstep</span></div>
     </div>
   </section>
 
@@ -281,12 +310,7 @@
           {#each productLines as line}<li><Icon name="check" size={16} />{line}</li>{/each}
           <li class="more">…and more</li>
         </ul>
-        <div class="about-actions">
-          <button class="button primary" type="button" onclick={() => requestCallback()}
-            >Request a callback</button
-          >
-          <a class="button" href="#products">View products</a>
-        </div>
+        {@render contactActions()}
       </div>
     </div>
   </section>
@@ -296,7 +320,7 @@
       <div class="section-heading centered">
         <p class="eyebrow-text">Our products</p>
         <h2>Browse by range</h2>
-        <p>Tap any product to see photos and video. Ask for a callback to get the latest price.</p>
+        <p>Tap any product to see photos and video. Call us for the latest price.</p>
       </div>
 
       {#each data.frames as frame, frameIndex}
@@ -307,8 +331,8 @@
               <h3>{frame.title}</h3>
               {#if frame.subtitle}<p>{frame.subtitle}</p>{/if}
             </div>
-            <button class="frame-enquire" type="button" onclick={() => requestCallback()}
-              >Enquire about this range <Icon name="arrow" size={15} /></button
+            <a class="frame-enquire" href={`tel:${phone}`}
+              ><Icon name="phone" size={16} />Call us about this range</a
             >
           </div>
           <div class="product-grid">
@@ -342,8 +366,8 @@
                       <span>Quantity</span><strong>{product.stock}</strong>
                     </div>
                   </div>
-                  <button class="enquire" type="button" onclick={() => requestCallback(product)}
-                    >Enquire <Icon name="arrow" size={15} /></button
+                  {@render cashOnDelivery()}
+                  <a class="enquire" href={`tel:${phone}`}><Icon name="phone" size={17} />Call us</a
                   >
                 </div>
               </article>
@@ -375,6 +399,17 @@
           <div><span>Film 02</span><strong>Close-up and flexibility</strong></div>
         </article>
       </div>
+      <div class="follow">
+        <p>Watch more of our products working</p>
+        <div>
+          <a class="button youtube" href={YOUTUBE_URL} target="_blank" rel="noreferrer"
+            ><Icon name="youtube" size={22} />YouTube</a
+          >
+          <a class="button instagram" href={INSTAGRAM_URL} target="_blank" rel="noreferrer"
+            ><Icon name="instagram" size={20} />Instagram</a
+          >
+        </div>
+      </div>
     </div>
   </section>
 
@@ -400,10 +435,10 @@
           <span>Prefer to talk now?</span>
           <div>
             <a class="button primary" href={`tel:${phone}`}
-              ><Icon name="phone" size={16} />Call {phoneLabel}</a
+              ><Icon name="phone" size={18} />Call us · {phoneLabel}</a
             >
             <a class="button whatsapp" href={whatsappHref} target="_blank" rel="noreferrer"
-              ><Icon name="whatsapp" size={18} />WhatsApp</a
+              ><Icon name="whatsapp" size={19} />WhatsApp</a
             >
           </div>
         </div>
@@ -528,6 +563,12 @@
         <a href={`mailto:${data.settings.email}`} aria-label="Email"
           ><Icon name="mail" size={16} /></a
         >
+        <a href={YOUTUBE_URL} target="_blank" rel="noreferrer" aria-label="YouTube"
+          ><Icon name="youtube" size={18} /></a
+        >
+        <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" aria-label="Instagram"
+          ><Icon name="instagram" size={17} /></a
+        >
       </div>
     </div>
     <div>
@@ -575,19 +616,40 @@
   {@const viewedProduct = activeProduct}
   {@const media = productMedia(viewedProduct)}
   {@const selectedMedia = media[activeMediaIndex] ?? media[0]}
-  <div class="product-viewer" role="presentation">
-    <button class="viewer-backdrop" type="button" onclick={closeProduct} aria-label="Close gallery"
-    ></button>
-    <div
-      class="viewer-shell"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${viewedProduct.name} media gallery`}
-    >
-      <button class="viewer-close" type="button" onclick={closeProduct} aria-label="Close gallery"
-        >×</button
+  <div
+    class="product-viewer"
+    role="dialog"
+    aria-modal="true"
+    aria-label={`${viewedProduct.name} photos and video`}
+  >
+    <div class="viewer-stage">
+      {#if selectedMedia?.type === 'image'}
+        <img src={selectedMedia.src} alt={viewedProduct.name} />
+      {:else if selectedMedia}
+        <video src={selectedMedia.src} controls autoplay playsinline preload="metadata">
+          <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
+        </video>
+      {/if}
+      <button class="viewer-close" type="button" onclick={closeProduct} aria-label="Close">×</button
       >
-      <div class="viewer-thumbnails" aria-label="Choose media">
+      {#if media.length > 1}
+        <button
+          class="viewer-nav prev"
+          type="button"
+          onclick={() => showMedia(-1)}
+          aria-label="Previous photo">‹</button
+        >
+        <button
+          class="viewer-nav next"
+          type="button"
+          onclick={() => showMedia(1)}
+          aria-label="Next photo">›</button
+        >
+        <span class="viewer-count">{activeMediaIndex + 1} / {media.length}</span>
+      {/if}
+    </div>
+    <div class="viewer-side">
+      <div class="viewer-thumbnails" aria-label="Choose photo or video">
         {#each media as item, mediaIndex}
           <button
             type="button"
@@ -604,15 +666,6 @@
           </button>
         {/each}
       </div>
-      <div class="viewer-stage">
-        {#if selectedMedia?.type === 'image'}
-          <img src={selectedMedia.src} alt={viewedProduct.name} />
-        {:else if selectedMedia}
-          <video src={selectedMedia.src} controls autoplay playsinline preload="metadata">
-            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
-          </video>
-        {/if}
-      </div>
       <div class="viewer-purchase">
         <h3>{viewedProduct.name}</h3>
         {#if viewedProduct.description}<p>{viewedProduct.description}</p>{/if}
@@ -626,11 +679,10 @@
             <span>Quantity</span><strong>{viewedProduct.stock}</strong>
           </div>
         </div>
-        <button class="button primary" type="button" onclick={() => requestCallback(viewedProduct)}
-          >Request a callback</button
-        >
+        {@render cashOnDelivery()}
       </div>
     </div>
+    <div class="viewer-actions">{@render contactActions(viewedProduct)}</div>
   </div>
 {/if}
 
@@ -643,11 +695,8 @@
 >
 
 <nav class="mobile-dock" aria-label="Quick actions">
-  <a href={`tel:${phone}`}><Icon name="phone" size={18} />Call</a>
+  <a href={`tel:${phone}`}><Icon name="phone" size={22} />Call us</a>
   <a href={whatsappHref} target="_blank" rel="noreferrer"
-    ><Icon name="whatsapp" size={19} />WhatsApp</a
-  >
-  <button type="button" onclick={() => requestCallback()}
-    ><Icon name="chat" size={18} />Callback</button
+    ><Icon name="whatsapp" size={23} />WhatsApp</a
   >
 </nav>
