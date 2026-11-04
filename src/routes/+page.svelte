@@ -49,6 +49,12 @@
   );
   const whatsappNumber = $derived(data.settings.whatsapp.replace(/\D/g, '').slice(-10));
   const whatsappHref = $derived(whatsappLink());
+  const videos = $derived(
+    [
+      { src: data.settings.video_1_url, title: 'Rubber and washer' },
+      { src: data.settings.video_2_url, title: 'Close-up and flexibility' }
+    ].filter((video) => video.src)
+  );
 
   $effect(() => {
     if (typeof document === 'undefined') return;
@@ -357,25 +363,28 @@
 
   <section class="videos section" id="videos">
     <div class="container">
-      <div class="section-heading centered light">
-        <p class="eyebrow-text">See it working</p>
-        <h2>Know what arrives</h2>
-        <p>Short, clear videos of our products — made for your phone.</p>
-      </div>
-      <div class="video-grid">
-        <article>
-          <video controls playsinline preload="metadata" src={data.settings.video_1_url}>
-            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
-          </video>
-          <div><span>Film 01</span><strong>Rubber and washer</strong></div>
-        </article>
-        <article>
-          <video controls playsinline preload="metadata" src={data.settings.video_2_url}>
-            <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
-          </video>
-          <div><span>Film 02</span><strong>Close-up and flexibility</strong></div>
-        </article>
-      </div>
+      {#if videos.length}
+        <div class="section-heading centered light">
+          <p class="eyebrow-text">See it working</p>
+          <h2>Know what arrives</h2>
+          <p>Short, clear videos of our products — made for your phone.</p>
+        </div>
+        <div class="video-grid" class:single={videos.length === 1}>
+          {#each videos as video, index}
+            <article>
+              <video controls playsinline preload="metadata" src={video.src}>
+                <track
+                  kind="captions"
+                  src="/media/demo-captions.vtt"
+                  srclang="en"
+                  label="English"
+                />
+              </video>
+              <div><span>Film 0{index + 1}</span><strong>{video.title}</strong></div>
+            </article>
+          {/each}
+        </div>
+      {/if}
       <div class="follow">
         <p>Watch more of our products working</p>
         <div>

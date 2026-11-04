@@ -8,8 +8,7 @@
     field,
     src,
     label,
-    video = false,
-    removable = false
+    video = false
   }: {
     kind: 'settings';
     id: number;
@@ -17,7 +16,6 @@
     src: string;
     label: string;
     video?: boolean;
-    removable?: boolean;
   } = $props();
 
   const MAX_BYTES = 4 * 1024 * 1024;
@@ -95,6 +93,7 @@
   }
 
   async function remove() {
+    if (!confirm(`Remove ${label} from the website?`)) return;
     const body = new FormData();
     body.set('remove', '1');
     await send(body);
@@ -126,9 +125,8 @@
   </label>
   <div class="tile-foot">
     <span class="tile-label">{label}</span>
-    {#if status === 'saved'}
-      <span class="tile-saved">Saved ✓</span>
-    {:else if removable && current && status !== 'uploading'}
+    {#if status === 'saved'}<span class="tile-saved">Saved ✓</span>{/if}
+    {#if current && status !== 'uploading'}
       <button type="button" class="tile-remove" onclick={remove}>Remove</button>
     {/if}
   </div>
@@ -210,11 +208,12 @@
   .tile-foot {
     display: flex;
     min-height: 22px;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
+    gap: 2px 8px;
   }
   .tile-label {
+    margin-right: auto;
     color: var(--muted);
     font-size: 0.75rem;
     font-weight: 700;
@@ -225,6 +224,7 @@
     font-weight: 800;
   }
   .tile-remove {
+    min-height: 28px;
     padding: 0;
     border: 0;
     background: none;

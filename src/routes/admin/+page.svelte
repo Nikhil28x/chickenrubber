@@ -493,7 +493,6 @@
             field="hero_image_url"
             src={data.settings.hero_image_url}
             label="Hero background"
-            removable
           />
           <MediaTile
             kind="settings"

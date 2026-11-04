@@ -1046,6 +1046,10 @@ a.infobar-item:hover {
   max-width: 980px;
   margin: 0 auto;
 }
+.video-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 480px;
+}
 .video-grid article {
   overflow: hidden;
   border: 1px solid var(--on-dark-line);
