@@ -1,6 +1,8 @@
 <script lang="ts">
   import Icon from '../lib/components/Icon.svelte';
   import Logo from '../lib/components/Logo.svelte';
+  import ProductPhotos from '../lib/components/ProductPhotos.svelte';
+  import ReviewsSection from '../lib/components/ReviewsSection.svelte';
   import { INSTAGRAM_URL, YOUTUBE_URL } from '../lib/social';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
@@ -57,19 +59,26 @@
   });
 
   function productMedia(product: Product) {
-    const images = [...new Set([product.image_url, product.image_2_url, product.image_3_url])]
-      .filter(Boolean)
-      .map((src, index) => ({ type: 'image' as const, src, label: `Photo ${index + 1}` }));
-    return product.product_video_url
-      ? [...images, { type: 'video' as const, src: product.product_video_url, label: 'Video' }]
-      : images;
+    const media = product.media.map((item, index) => ({
+      type: item.kind,
+      src: item.url,
+      label: item.kind === 'video' ? 'Video' : `Photo ${index + 1}`
+    }));
+    // The main photo always opens first.
+    const main = media.findIndex((item) => item.src === product.image_url);
+    if (main > 0) media.unshift(...media.splice(main, 1));
+    return media.length
+      ? media
+      : [{ type: 'image' as const, src: product.image_url, label: 'Photo' }];
   }
 
   function mediaLabel(product: Product) {
-    const media = productMedia(product);
-    const photos = media.filter((item) => item.type === 'image').length;
-    const video = media.length > photos ? ' + video' : '';
-    return `${photos} photo${photos === 1 ? '' : 's'}${video}`;
+    const photos = product.media.filter((item) => item.kind === 'image').length;
+    const videos = product.media.length - photos;
+    const parts = [];
+    if (photos) parts.push(`${photos} photo${photos === 1 ? '' : 's'}`);
+    if (videos) parts.push(`${videos} video${videos === 1 ? '' : 's'}`);
+    return parts.join(' + ') || 'Photo';
   }
 
   function whatsappLink(product?: Product) {
@@ -85,9 +94,9 @@
     activeMediaIndex = (activeMediaIndex + step + count) % count;
   }
 
-  function openProduct(product: Product) {
+  function openProduct(product: Product, mediaIndex = 0) {
     activeProduct = product;
-    activeMediaIndex = 0;
+    activeMediaIndex = mediaIndex;
   }
 
   function closeProduct() {
@@ -178,22 +187,17 @@
       <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp"
         ><Icon name="whatsapp" size={22} /></a
       >
-      <a href={`tel:${phone}`} aria-label="Call"><Icon name="phone" size={20} /></a>
-      <a href={`mailto:${data.settings.email}`} aria-label="Email"><Icon name="mail" size={20} /></a
+      <a class="infobar-call" href={`tel:${phone}`} aria-label="Call"
+        ><Icon name="phone" size={20} /></a
       >
-      <a
-        class="social-extra"
-        href={YOUTUBE_URL}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="YouTube"><Icon name="youtube" size={22} /></a
+      <a class="infobar-mail" href={`mailto:${data.settings.email}`} aria-label="Email"
+        ><Icon name="mail" size={20} /></a
       >
-      <a
-        class="social-extra"
-        href={INSTAGRAM_URL}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Instagram"><Icon name="instagram" size={20} /></a
+      <a href={YOUTUBE_URL} target="_blank" rel="noreferrer" aria-label="YouTube"
+        ><Icon name="youtube" size={22} /></a
+      >
+      <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" aria-label="Instagram"
+        ><Icon name="instagram" size={20} /></a
       >
     </div>
   </div>
@@ -316,22 +320,17 @@
           <div class="product-grid">
             {#each frame.products as product, index}
               <article class="product-card">
-                <button
-                  class="product-image"
-                  type="button"
-                  onclick={() => openProduct(product)}
-                  aria-label={`Open photos and video for ${product.name}`}
+                <ProductPhotos
+                  media={productMedia(product)}
+                  name={product.name}
+                  eager={frameIndex === 0 && index < 2}
+                  label={product.media.length ? mediaLabel(product) : ''}
+                  onopen={(mediaIndex) => openProduct(product, mediaIndex)}
                 >
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    loading={frameIndex > 0 || index > 1 ? 'lazy' : 'eager'}
-                  />
                   {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
                       class="stock out">Out of stock</span
                     >{/if}
-                  <span class="view-media" aria-hidden="true">{mediaLabel(product)}</span>
-                </button>
+                </ProductPhotos>
                 <div class="product-info">
                   <h4>{product.name}</h4>
                   <div class="product-meta">
@@ -515,6 +514,8 @@
       </div>
     </div>
   </section>
+
+  <ReviewsSection reviews={data.reviews} />
 </main>
 
 <footer class="site-footer">
@@ -551,6 +552,7 @@
         <li><a href="#products">Products</a></li>
         <li><a href="#videos">Videos</a></li>
         <li><a href="#callback">Contact us</a></li>
+        <li><a href="#reviews">Reviews</a></li>
       </ul>
     </div>
     <div>
@@ -572,6 +574,10 @@
         </li>
       </ul>
     </div>
+  </div>
+  <div class="container footer-terms">
+    <span>No return, no exchange</span>
+    <span>No guarantee, no warranty</span>
   </div>
   <div class="container footer-bottom">
     <span>© {new Date().getFullYear()} {data.settings.business_name}. All rights reserved.</span>

@@ -1,35 +1,39 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { PRODUCT_COLUMNS, dbQuery, initDb } from '../../lib/server/db';
+import {
+  PRODUCT_COLUMNS,
+  SETTINGS_COLUMNS,
+  dbQuery,
+  initDb,
+  withMedia,
+  type ProductRow
+} from '../../lib/server/db';
 import { insertPlaceholderProducts } from '../../lib/server/schema';
-import type { Frame, Product } from '../../lib/types';
+import type { AdminReview, Frame } from '../../lib/types';
 import type { Actions, PageServerLoad } from './$types';
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_VIDEO_SIZE = 15 * 1024 * 1024;
 
 function field(form: FormData, name: string) {
   return String(form.get(name) || '').trim();
 }
 
-async function fileToDataUrl(value: FormDataEntryValue | null, maxSize: number) {
-  if (!(value instanceof File) || value.size === 0) return '';
-  if (value.size > maxSize)
-    throw new Error(`File is too large. Maximum ${Math.round(maxSize / 1024 / 1024)} MB.`);
-  const allowed = value.type.startsWith('image/') || value.type.startsWith('video/');
-  if (!allowed) throw new Error('Only image and video files are allowed.');
-  return `data:${value.type};base64,${Buffer.from(await value.arrayBuffer()).toString('base64')}`;
+function reviewFields(form: FormData) {
+  return {
+    name: field(form, 'customer_name').slice(0, 80),
+    location: field(form, 'location').slice(0, 80),
+    rating: Math.min(5, Math.max(1, Math.round(Number(field(form, 'rating'))) || 5)),
+    comment: field(form, 'comment').slice(0, 300)
+  };
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.admin) redirect(303, '/admin/login');
   await initDb();
 
-  const [settings, frames, products, orders, counts] = await Promise.all([
-    dbQuery('SELECT * FROM site_settings WHERE id = 1'),
+  const [settings, frames, products, orders, counts, reviews] = await Promise.all([
+    dbQuery(`SELECT ${SETTINGS_COLUMNS} FROM site_settings WHERE id = 1`),
     dbQuery<Frame>(
       'SELECT id, title, subtitle, is_active, sort_order FROM frames ORDER BY sort_order, id'
     ),
-    dbQuery<Product>(`SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY sort_order, id`),
+    dbQuery<ProductRow>(`SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY sort_order, id`),
     dbQuery(
       `SELECT id, order_number::text, customer_name, mobile_primary, mobile_secondary, pincode, state,
        district, city, locality, road, landmark, shop_name, payment_method, items, total::float8 AS total,
@@ -39,16 +43,22 @@ export const load: PageServerLoad = async ({ locals }) => {
       `SELECT COUNT(*)::int AS total_orders,
        COUNT(*) FILTER (WHERE status IN ('confirmed', 'processing'))::int AS open_orders,
        (SELECT COUNT(*)::int FROM frames WHERE is_active) AS live_frames FROM orders`
+    ),
+    dbQuery<AdminReview>(
+      `SELECT id, customer_name, location, mobile, rating, comment, source, is_approved, created_at
+       FROM reviews ORDER BY is_approved, created_at DESC, id DESC LIMIT 200`
     )
   ]);
 
+  const allProducts = await withMedia(products.rows);
   return {
     settings: settings.rows[0],
     frames: frames.rows.map((frame) => ({
       ...frame,
-      products: products.rows.filter((product) => product.frame_id === frame.id)
+      products: allProducts.filter((product) => product.frame_id === frame.id)
     })),
     orders: orders.rows,
+    reviews: reviews.rows,
     stats: counts.rows[0]
   };
 };
@@ -56,36 +66,22 @@ export const load: PageServerLoad = async ({ locals }) => {
 export const actions: Actions = {
   updateSettings: async ({ request, locals }) => {
     if (!locals.admin) redirect(303, '/admin/login');
-    try {
-      const form = await request.formData();
-      const heroUpload = await fileToDataUrl(form.get('hero_upload'), MAX_IMAGE_SIZE);
-      const video1Upload = await fileToDataUrl(form.get('video_1_upload'), MAX_VIDEO_SIZE);
-      const video2Upload = await fileToDataUrl(form.get('video_2_upload'), MAX_VIDEO_SIZE);
-
-      await dbQuery(
-        `UPDATE site_settings SET
-          business_name=$1, phone=$2, secondary_phone=$3, email=$4, whatsapp=$5, address=$6,
-          hero_image_url=$7, video_1_url=$8, video_2_url=$9, updated_at=NOW()
-        WHERE id=1`,
-        [
-          field(form, 'business_name'),
-          field(form, 'phone'),
-          field(form, 'secondary_phone'),
-          field(form, 'email'),
-          field(form, 'whatsapp'),
-          field(form, 'address'),
-          heroUpload || field(form, 'hero_image_url'),
-          video1Upload || field(form, 'video_1_url'),
-          video2Upload || field(form, 'video_2_url')
-        ]
-      );
-      return { success: 'Business details saved.', tab: 'settings' as const };
-    } catch (error) {
-      return fail(400, {
-        error: error instanceof Error ? error.message : 'Could not save settings',
-        tab: 'settings' as const
-      });
-    }
+    const form = await request.formData();
+    await dbQuery(
+      `UPDATE site_settings SET
+        business_name=$1, phone=$2, secondary_phone=$3, email=$4, whatsapp=$5, address=$6,
+        updated_at=NOW()
+      WHERE id=1`,
+      [
+        field(form, 'business_name'),
+        field(form, 'phone'),
+        field(form, 'secondary_phone'),
+        field(form, 'email'),
+        field(form, 'whatsapp'),
+        field(form, 'address')
+      ]
+    );
+    return { success: 'Business details saved.', tab: 'settings' as const };
   },
 
   updateFrame: async ({ request, locals }) => {
@@ -131,41 +127,62 @@ export const actions: Actions = {
 
   updateProduct: async ({ request, locals }) => {
     if (!locals.admin) redirect(303, '/admin/login');
-    try {
-      const form = await request.formData();
-      const id = Number(field(form, 'id'));
-      const imageUpload = await fileToDataUrl(form.get('image_upload'), MAX_IMAGE_SIZE);
-      const image2Upload = await fileToDataUrl(form.get('image_2_upload'), MAX_IMAGE_SIZE);
-      const image3Upload = await fileToDataUrl(form.get('image_3_upload'), MAX_IMAGE_SIZE);
-      const productVideoUpload = await fileToDataUrl(
-        form.get('product_video_upload'),
-        MAX_VIDEO_SIZE
-      );
-      await dbQuery(
-        `UPDATE products SET name=$1, description=$2, price=$3, stock=$4, image_url=$5,
-         image_2_url=$6, image_3_url=$7, product_video_url=$8, is_active=$9, sort_order=$10,
-         updated_at=NOW() WHERE id=$11`,
-        [
-          field(form, 'name'),
-          field(form, 'description'),
-          Math.max(0, Number(field(form, 'price')) || 0),
-          Math.max(0, Number(field(form, 'stock')) || 0),
-          imageUpload || field(form, 'image_url'),
-          image2Upload || field(form, 'image_2_url'),
-          image3Upload || field(form, 'image_3_url'),
-          productVideoUpload || field(form, 'product_video_url'),
-          form.get('is_active') === 'on',
-          Number(field(form, 'sort_order')) || 0,
-          id
-        ]
-      );
-      return { success: `${field(form, 'name')} saved.`, tab: 'products' as const };
-    } catch (error) {
-      return fail(400, {
-        error: error instanceof Error ? error.message : 'Could not save product',
-        tab: 'products' as const
-      });
+    const form = await request.formData();
+    // Photos and videos are saved on their own as soon as they are picked.
+    await dbQuery(
+      `UPDATE products SET name=$1, description=$2, price=$3, stock=$4, is_active=$5,
+       sort_order=$6, updated_at=NOW() WHERE id=$7`,
+      [
+        field(form, 'name'),
+        field(form, 'description'),
+        Math.max(0, Number(field(form, 'price')) || 0),
+        Math.max(0, Number(field(form, 'stock')) || 0),
+        form.get('is_active') === 'on',
+        Number(field(form, 'sort_order')) || 0,
+        Number(field(form, 'id'))
+      ]
+    );
+    return { success: `${field(form, 'name')} saved.`, tab: 'products' as const };
+  },
+
+  addReview: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const { name, location, rating, comment } = reviewFields(await request.formData());
+    if (!name || !comment) {
+      return fail(400, { error: 'Enter the customer name and review', tab: 'reviews' as const });
     }
+    await dbQuery(
+      `INSERT INTO reviews (customer_name, location, rating, comment, source, is_approved)
+       VALUES ($1, $2, $3, $4, 'admin', TRUE)`,
+      [name, location, rating, comment]
+    );
+    return { success: `Review from ${name} is on the website.`, tab: 'reviews' as const };
+  },
+
+  updateReview: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const form = await request.formData();
+    const { name, location, rating, comment } = reviewFields(form);
+    if (!name || !comment) {
+      return fail(400, { error: 'Enter the customer name and review', tab: 'reviews' as const });
+    }
+    const show = field(form, 'show') === '1';
+    await dbQuery(
+      `UPDATE reviews SET customer_name=$1, location=$2, rating=$3, comment=$4, is_approved=$5
+       WHERE id=$6`,
+      [name, location, rating, comment, show, Number(field(form, 'id'))]
+    );
+    return {
+      success: show ? `Review from ${name} is on the website.` : `Review from ${name} is hidden.`,
+      tab: 'reviews' as const
+    };
+  },
+
+  deleteReview: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const form = await request.formData();
+    await dbQuery('DELETE FROM reviews WHERE id=$1', [Number(field(form, 'id'))]);
+    return { success: 'Review deleted.', tab: 'reviews' as const };
   },
 
   updateOrder: async ({ request, locals }) => {

@@ -61,8 +61,8 @@ export async function insertPlaceholderProducts(db: Queryable, frameId: number, 
   for (let slot = 1; slot <= PRODUCTS_PER_FRAME; slot++) {
     await db.query(
       `INSERT INTO products (frame_id, name, description, price, stock, image_url, image_2_url,
-       image_3_url, product_video_url, is_active, sort_order)
-       VALUES ($1, $2, '', 0, 10, $3, '', '', '', TRUE, $4)`,
+       image_3_url, product_video_url, is_active, sort_order, media_migrated)
+       VALUES ($1, $2, '', 0, 10, $3, '', '', '', TRUE, $4, TRUE)`,
       [frameId, `${item} · Model ${slot}`, PLACEHOLDER_IMAGE, slot]
     );
   }
@@ -142,6 +142,34 @@ export async function migrate(pool: pg.Pool) {
       ALTER TABLE products ADD COLUMN IF NOT EXISTS frame_id INTEGER REFERENCES frames(id);
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS message TEXT NOT NULL DEFAULT '';
 
+      -- Any number of photos and videos per product, in display order.
+      CREATE TABLE IF NOT EXISTS product_media (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('image', 'video')),
+        url TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS product_media_product_idx
+        ON product_media (product_id, sort_order, id);
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS media_migrated BOOLEAN NOT NULL DEFAULT FALSE;
+
+      -- Customer reviews. Nothing shows on the website until it is approved.
+      -- The mobile number is only for checking a review and is never shown.
+      CREATE TABLE IF NOT EXISTS reviews (
+        id SERIAL PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        location TEXT NOT NULL DEFAULT '',
+        mobile TEXT NOT NULL DEFAULT '',
+        rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        comment TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'website' CHECK (source IN ('website', 'admin')),
+        is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS reviews_approved_idx ON reviews (is_approved, created_at DESC);
+
       DO $$
       BEGIN
         IF NOT EXISTS (
@@ -212,6 +240,21 @@ export async function migrate(pool: pg.Pool) {
         }
       }
     }
+
+    // Copy each product's original three photos and one video into
+    // product_media once; after that, product_media is the only source.
+    await client.query(
+      `INSERT INTO product_media (product_id, kind, url, sort_order)
+       SELECT p.id, m.kind, m.url, m.position
+       FROM products p
+       CROSS JOIN LATERAL (VALUES
+         ('image', p.image_url, 1), ('image', p.image_2_url, 2),
+         ('image', p.image_3_url, 3), ('video', p.product_video_url, 4)
+       ) AS m(kind, url, position)
+       WHERE NOT p.media_migrated AND m.url <> '' AND m.url <> $1`,
+      [PLACEHOLDER_IMAGE]
+    );
+    await client.query('UPDATE products SET media_migrated = TRUE WHERE NOT media_migrated');
 
     await client.query('COMMIT');
   } catch (error) {

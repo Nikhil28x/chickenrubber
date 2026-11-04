@@ -5,12 +5,17 @@ export type Product = {
   description: string;
   price: number;
   stock: number;
+  /** Main photo: the first photo in `media`, or a placeholder. */
   image_url: string;
-  image_2_url: string;
-  image_3_url: string;
-  product_video_url: string;
+  media: ProductMedia[];
   is_active: boolean;
   sort_order: number;
+};
+
+export type ProductMedia = {
+  id: number;
+  kind: 'image' | 'video';
+  url: string;
 };
 
 export type Frame = {
@@ -22,6 +27,21 @@ export type Frame = {
 };
 
 export type FrameWithProducts = Frame & { products: Product[] };
+
+export type Review = {
+  id: number;
+  customer_name: string;
+  location: string;
+  rating: number;
+  comment: string;
+};
+
+export type AdminReview = Review & {
+  mobile: string;
+  source: 'website' | 'admin';
+  is_approved: boolean;
+  created_at: string;
+};
 
 export type SiteSettings = {
   business_name: string;

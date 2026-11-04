@@ -1,13 +1,22 @@
 import pg from 'pg';
 import { DATABASE_URL } from '$app/env/private';
-import type { Frame, FrameWithProducts, Product, SiteSettings } from '../types';
+import type {
+  Frame,
+  FrameWithProducts,
+  Product,
+  ProductMedia,
+  Review,
+  SiteSettings
+} from '../types';
 import {
   BUSINESS_NAME,
+  PLACEHOLDER_IMAGE,
   PRODUCTS_PER_FRAME,
   defaultFrameSeeds,
   defaultRubberProducts,
   migrate
 } from './schema';
+import { PRODUCT_COLUMNS, PRODUCT_MEDIA_COLUMNS, SETTINGS_COLUMNS } from './media';
 
 const { Pool } = pg;
 
@@ -35,9 +44,14 @@ const defaultProducts: Product[] = defaultRubberProducts.map(
     price: 0,
     stock: 100,
     image_url: `/products/rubber-${a}.jpg`,
-    image_2_url: `/products/rubber-${b}.jpg`,
-    image_3_url: `/products/rubber-${c}.jpg`,
-    product_video_url: `/media/product-demo-${video}.mp4`,
+    media: [
+      ...[a, b, c].map((n, i) => ({
+        id: index * 10 + i,
+        kind: 'image' as const,
+        url: `/products/rubber-${n}.jpg`
+      })),
+      { id: index * 10 + 3, kind: 'video' as const, url: `/media/product-demo-${video}.mp4` }
+    ],
     is_active: true,
     sort_order: index + 1
   })
@@ -54,8 +68,25 @@ const defaultFrames: FrameWithProducts[] = [
   }
 ];
 
-export const PRODUCT_COLUMNS = `id, frame_id, name, description, price::float8 AS price, stock,
-  image_url, image_2_url, image_3_url, product_video_url, is_active, sort_order`;
+export { PRODUCT_COLUMNS, SETTINGS_COLUMNS };
+
+export type ProductRow = Omit<Product, 'image_url' | 'media'>;
+
+// Adds each product's photos and videos, and its main photo (the first photo).
+export async function withMedia(products: ProductRow[]): Promise<Product[]> {
+  const media = await dbQuery<ProductMedia & { product_id: number }>(
+    `SELECT ${PRODUCT_MEDIA_COLUMNS} FROM product_media
+     WHERE product_id = ANY($1::int[]) ORDER BY sort_order, id`,
+    [products.map((product) => product.id)]
+  );
+  return products.map((product) => {
+    const items = media.rows
+      .filter((row) => row.product_id === product.id)
+      .map(({ id, kind, url }) => ({ id, kind, url }));
+    const mainPhoto = items.find((item) => item.kind === 'image')?.url;
+    return { ...product, image_url: mainPhoto ?? PLACEHOLDER_IMAGE, media: items };
+  });
+}
 
 function getPool() {
   if (!DATABASE_URL) return undefined;
@@ -82,30 +113,40 @@ export async function initDb() {
 
 export async function getStorefront() {
   const db = getPool();
-  const fallback = { settings: defaultSettings, frames: defaultFrames, databaseReady: false };
+  const fallback = {
+    settings: defaultSettings,
+    frames: defaultFrames,
+    reviews: [] as Review[],
+    databaseReady: false
+  };
   if (!db) return fallback;
 
   try {
     await initDb();
-    const [settingsResult, framesResult, productsResult] = await Promise.all([
-      db.query<SiteSettings>('SELECT * FROM site_settings WHERE id = 1'),
+    const [settingsResult, framesResult, productsResult, reviewsResult] = await Promise.all([
+      db.query<SiteSettings>(`SELECT ${SETTINGS_COLUMNS} FROM site_settings WHERE id = 1`),
       db.query<Frame>(
         `SELECT id, title, subtitle, is_active, sort_order FROM frames
          WHERE is_active = TRUE ORDER BY sort_order, id`
       ),
-      db.query<Product>(
+      db.query<ProductRow>(
         `SELECT ${PRODUCT_COLUMNS} FROM products p
          WHERE is_active = TRUE AND EXISTS (
            SELECT 1 FROM frames f WHERE f.id = p.frame_id AND f.is_active = TRUE
          )
          ORDER BY sort_order, id`
+      ),
+      db.query<Review>(
+        `SELECT id, customer_name, location, rating, comment FROM reviews
+         WHERE is_approved = TRUE ORDER BY created_at DESC, id DESC LIMIT 30`
       )
     ]);
 
+    const products = await withMedia(productsResult.rows);
     const frames = framesResult.rows
       .map((frame) => ({
         ...frame,
-        products: productsResult.rows
+        products: products
           .filter((product) => product.frame_id === frame.id)
           .slice(0, PRODUCTS_PER_FRAME)
       }))
@@ -114,6 +155,7 @@ export async function getStorefront() {
     return {
       settings: settingsResult.rows[0] ?? defaultSettings,
       frames,
+      reviews: reviewsResult.rows,
       databaseReady: true
     };
   } catch (error) {

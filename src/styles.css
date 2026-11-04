@@ -741,7 +741,6 @@ a.infobar-item:hover {
   padding: 0;
   border: 0;
   background: var(--soft);
-  cursor: zoom-in;
 }
 .product-image img {
   width: 100%;
@@ -1129,12 +1128,15 @@ a.infobar-item:hover {
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 8px 16px;
 }
 .form-grid .full {
   grid-column: 1 / -1;
 }
-.form-grid label,
+.form-grid label {
+  display: grid;
+  gap: 4px;
+}
 .admin-field {
   display: grid;
   gap: 6px;
@@ -1266,6 +1268,17 @@ a.infobar-item:hover {
   margin-top: 3px;
   color: var(--accent);
 }
+.footer-terms {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 16px;
+  padding-bottom: 12px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 .footer-bottom {
   display: flex;
   flex-wrap: wrap;
@@ -1393,9 +1406,11 @@ a.infobar-item:hover {
   }
   .infobar-inner {
     min-height: 64px;
+    gap: 8px;
   }
-  /* Not enough room beside the phone number; these live in the footer and videos section. */
-  .infobar-social .social-extra {
+  /* The number beside these already calls and email is in the footer, so both make room. */
+  .infobar-social .infobar-call,
+  .infobar-social .infobar-mail {
     display: none;
   }
   .infobar-address {
@@ -1569,5 +1584,11 @@ a.infobar-item:hover {
     padding: 5px 8px;
     font-size: 0.68rem;
     letter-spacing: 0;
+  }
+}
+
+@media (max-width: 340px) {
+  .infobar-phone .icon {
+    display: none;
   }
 }

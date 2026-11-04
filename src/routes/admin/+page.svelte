@@ -1,12 +1,16 @@
 <script lang="ts">
   import Logo from '../../lib/components/Logo.svelte';
+  import MediaTile from '../../lib/components/MediaTile.svelte';
+  import ProductGallery from '../../lib/components/ProductGallery.svelte';
   import { untrack } from 'svelte';
   import type { ActionData, PageData } from './$types';
   let { data, form }: { data: PageData; form: ActionData } = $props();
   // Forms post without JS enhancement, so reopen the tab that was just saved.
-  let activeTab = $state<'orders' | 'products' | 'settings'>(
+  let activeTab = $state<'orders' | 'products' | 'reviews' | 'settings'>(
     untrack(() => (form && 'tab' in form && form.tab ? form.tab : 'orders'))
   );
+
+  const waitingReviews = $derived(data.reviews.filter((review) => !review.is_approved).length);
 
   function money(value: number) {
     return new Intl.NumberFormat('en-IN', {
@@ -46,36 +50,17 @@
       .filter(Boolean)
       .join(', ');
   }
-
-  async function resizePhonePhoto(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file || !file.type.startsWith('image/') || file.size < 1_500_000) return;
-
-    try {
-      const bitmap = await createImageBitmap(file);
-      const maxSide = 1800;
-      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(bitmap.width * scale);
-      canvas.height = Math.round(bitmap.height * scale);
-      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', 0.82)
-      );
-      bitmap.close();
-      if (!blob || blob.size >= file.size) return;
-
-      const files = new DataTransfer();
-      files.items.add(
-        new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
-      );
-      input.files = files.files;
-    } catch {
-      // Keep the original file if the browser cannot resize this format.
-    }
-  }
 </script>
+
+{#snippet ratingField(rating: number)}
+  <label class="admin-field"
+    ><span>Stars</span><select name="rating" value={rating}>
+      {#each [5, 4, 3, 2, 1] as stars}
+        <option value={stars}>{'★'.repeat(stars)} ({stars})</option>
+      {/each}
+    </select></label
+  >
+{/snippet}
 
 <svelte:head><title>Store admin | Naazare Enterprises</title></svelte:head>
 
@@ -112,6 +97,9 @@
     >
     <button class:active={activeTab === 'products'} onclick={() => (activeTab = 'products')}
       >Product frames <span>{data.frames.length}</span></button
+    >
+    <button class:active={activeTab === 'reviews'} onclick={() => (activeTab = 'reviews')}
+      >Reviews {#if waitingReviews}<span class="tab-new">{waitingReviews} new</span>{/if}</button
     >
     <button class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}
       >Business details</button
@@ -256,136 +244,56 @@
 
             <div class="admin-product-grid">
               {#each frame.products as product}
-                <form
-                  method="POST"
-                  action="?/updateProduct"
-                  enctype="multipart/form-data"
-                  class="edit-product"
-                >
-                  <input type="hidden" name="id" value={product.id} />
-                  <div class="product-media-admin">
-                    {#each [product.image_url, product.image_2_url, product.image_3_url] as src, i}
-                      <div>
-                        <div class="edit-product-image">
-                          {#if src}<img {src} alt={`${product.name}, photo ${i + 1}`} />{/if}
-                        </div>
-                        <span>Photo {i + 1}{i === 0 ? ' · Main' : ''}</span>
-                      </div>
-                    {/each}
-                    <div>
-                      <div class="edit-product-image video-preview">
-                        {#if product.product_video_url}
-                          <video
-                            src={product.product_video_url}
-                            muted
-                            playsinline
-                            preload="metadata"
-                          ></video>
-                          <b>▶</b>
-                        {/if}
-                      </div>
-                      <span>Video</span>
-                    </div>
-                  </div>
-                  <div class="media-fields">
+                <div class="edit-product">
+                  <ProductGallery productId={product.id} media={product.media} />
+                  <p class="upload-help">
+                    Tap a box to add or change a photo. It saves straight away.
+                  </p>
+                  <form method="POST" action="?/updateProduct" class="product-details">
+                    <input type="hidden" name="id" value={product.id} />
                     <label class="admin-field"
-                      ><span>Photo 1 link</span><input
-                        name="image_url"
-                        value={product.image_url}
+                      ><span>Product name</span><input
+                        name="name"
+                        value={product.name}
                         required
                       /></label
                     >
-                    <label class="upload-button"
-                      ><input
-                        type="file"
-                        name="image_upload"
-                        accept="image/*"
-                        onchange={resizePhonePhoto}
-                      /><span>Upload photo 1</span></label
-                    >
                     <label class="admin-field"
-                      ><span>Photo 2 link</span><input
-                        name="image_2_url"
-                        value={product.image_2_url}
-                      /></label
-                    >
-                    <label class="upload-button"
-                      ><input
-                        type="file"
-                        name="image_2_upload"
-                        accept="image/*"
-                        onchange={resizePhonePhoto}
-                      /><span>Upload photo 2</span></label
-                    >
-                    <label class="admin-field"
-                      ><span>Photo 3 link</span><input
-                        name="image_3_url"
-                        value={product.image_3_url}
-                      /></label
-                    >
-                    <label class="upload-button"
-                      ><input
-                        type="file"
-                        name="image_3_upload"
-                        accept="image/*"
-                        onchange={resizePhonePhoto}
-                      /><span>Upload photo 3</span></label
-                    >
-                    <label class="admin-field"
-                      ><span>Product video link</span><input
-                        name="product_video_url"
-                        value={product.product_video_url}
-                      /></label
-                    >
-                    <label class="upload-button"
-                      ><input type="file" name="product_video_upload" accept="video/*" /><span
-                        >Upload video (max 15 MB)</span
+                      ><span>Short description</span><textarea name="description" rows="2"
+                        >{product.description}</textarea
                       ></label
                     >
-                  </div>
-                  <p class="upload-help">Phone photos are resized automatically before upload.</p>
-                  <label class="admin-field"
-                    ><span>Product name</span><input
-                      name="name"
-                      value={product.name}
-                      required
-                    /></label
-                  >
-                  <label class="admin-field"
-                    ><span>Short description</span><textarea name="description" rows="2"
-                      >{product.description}</textarea
-                    ></label
-                  >
-                  <div class="two-fields">
-                    <label class="admin-field"
-                      ><span>Price ₹ (0 = ask price)</span><input
-                        name="price"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={product.price}
-                        required
-                      /></label
+                    <div class="two-fields">
+                      <label class="admin-field"
+                        ><span>Price ₹ (0 = ask price)</span><input
+                          name="price"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={product.price}
+                          required
+                        /></label
+                      >
+                      <label class="admin-field"
+                        ><span>Quantity</span><input
+                          name="stock"
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={product.stock}
+                          required
+                        /></label
+                      >
+                    </div>
+                    <input type="hidden" name="sort_order" value={product.sort_order} />
+                    <label class="toggle"
+                      ><input type="checkbox" name="is_active" checked={product.is_active} /><span
+                        >Show this product</span
+                      ></label
                     >
-                    <label class="admin-field"
-                      ><span>Quantity</span><input
-                        name="stock"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={product.stock}
-                        required
-                      /></label
-                    >
-                  </div>
-                  <input type="hidden" name="sort_order" value={product.sort_order} />
-                  <label class="toggle"
-                    ><input type="checkbox" name="is_active" checked={product.is_active} /><span
-                      >Show this product</span
-                    ></label
-                  >
-                  <button class="button primary" type="submit">Save product</button>
-                </form>
+                    <button class="button primary" type="submit">Save product</button>
+                  </form>
+                </div>
               {/each}
             </div>
           </details>
@@ -407,6 +315,115 @@
         <button class="button primary" type="submit">Add frame</button>
       </form>
     </section>
+  {:else if activeTab === 'reviews'}
+    <section class="admin-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow-text">Shown on the website after you approve</p>
+          <h2>Customer reviews</h2>
+        </div>
+        <p>
+          Check each review before showing it. Mobile numbers are for your checks and are never
+          shown.
+        </p>
+      </div>
+
+      <form method="POST" action="?/addReview" class="review-admin add-review">
+        <h3>Add a review from a customer</h3>
+        <p class="upload-help">
+          Only add what a real customer told you, such as a WhatsApp message or a Google review, and
+          ask them before using their name.
+        </p>
+        <div class="settings-grid">
+          <label class="admin-field"
+            ><span>Customer name</span><input name="customer_name" maxlength="80" required /></label
+          >
+          <label class="admin-field"
+            ><span>Town / city</span><input name="location" maxlength="80" /></label
+          >
+          {@render ratingField(5)}
+          <label class="admin-field full"
+            ><span>Review</span><textarea name="comment" rows="3" maxlength="300" required
+            ></textarea></label
+          >
+        </div>
+        <button class="button primary" type="submit">Add to website</button>
+      </form>
+
+      <div class="orders-list">
+        {#each data.reviews as review (review.id)}
+          <form method="POST" action="?/updateReview" class="review-admin">
+            <input type="hidden" name="id" value={review.id} />
+            <div class="review-admin-head">
+              <span class="review-state" class:live={review.is_approved}
+                >{review.is_approved ? 'On website' : 'Waiting for approval'}</span
+              >
+              <small>
+                {review.source === 'website' ? 'Sent from website' : 'Added by you'} ·
+                {dateTime(review.created_at)}
+                {#if review.mobile}
+                  · <a href={`tel:${review.mobile}`}>{review.mobile}</a>
+                {/if}
+              </small>
+            </div>
+            <div class="settings-grid">
+              <label class="admin-field"
+                ><span>Customer name</span><input
+                  name="customer_name"
+                  value={review.customer_name}
+                  maxlength="80"
+                  required
+                /></label
+              >
+              <label class="admin-field"
+                ><span>Town / city</span><input
+                  name="location"
+                  value={review.location}
+                  maxlength="80"
+                /></label
+              >
+              {@render ratingField(review.rating)}
+              <label class="admin-field full"
+                ><span>Review</span><textarea name="comment" rows="3" maxlength="300" required
+                  >{review.comment}</textarea
+                ></label
+              >
+            </div>
+            <div class="review-admin-actions">
+              <button
+                class="button"
+                class:primary={review.is_approved}
+                type="submit"
+                name="show"
+                value={review.is_approved ? '1' : '0'}>Save</button
+              >
+              <button
+                class="button"
+                class:primary={!review.is_approved}
+                type="submit"
+                name="show"
+                value={review.is_approved ? '0' : '1'}
+                >{review.is_approved ? 'Hide from website' : 'Approve and show'}</button
+              >
+              <button
+                class="review-delete"
+                type="submit"
+                formaction="?/deleteReview"
+                formnovalidate
+                onclick={(event) => {
+                  if (!confirm('Delete this review?')) event.preventDefault();
+                }}>Delete</button
+              >
+            </div>
+          </form>
+        {:else}
+          <div class="empty-state">
+            <h3>No reviews yet</h3>
+            <p>Reviews customers send from the website will wait here for your approval.</p>
+          </div>
+        {/each}
+      </div>
+    </section>
   {:else}
     <section class="admin-panel">
       <div class="panel-heading">
@@ -416,12 +433,7 @@
         </div>
         <p>Update the phone numbers, email, address, hero image and the two videos.</p>
       </div>
-      <form
-        method="POST"
-        action="?/updateSettings"
-        enctype="multipart/form-data"
-        class="settings-form"
-      >
+      <form method="POST" action="?/updateSettings" class="settings-form">
         <div class="settings-block">
           <h3>Contact details</h3>
           <div class="settings-grid">
@@ -469,51 +481,38 @@
             >
           </div>
         </div>
-        <div class="settings-block">
-          <h3>Hero image & videos</h3>
-          <div class="settings-grid">
-            <label class="admin-field full"
-              ><span>Hero background image link (optional)</span><input
-                name="hero_image_url"
-                value={data.settings.hero_image_url}
-              /></label
-            >
-            <label class="upload-button full"
-              ><input
-                type="file"
-                name="hero_upload"
-                accept="image/*"
-                onchange={resizePhonePhoto}
-              /><span>Upload hero background</span></label
-            >
-            <label class="admin-field full"
-              ><span>Video 1 link</span><input
-                name="video_1_url"
-                value={data.settings.video_1_url}
-                required
-              /></label
-            >
-            <label class="upload-button full"
-              ><input type="file" name="video_1_upload" accept="video/*" /><span
-                >Upload video 1 (max 15 MB)</span
-              ></label
-            >
-            <label class="admin-field full"
-              ><span>Video 2 link</span><input
-                name="video_2_url"
-                value={data.settings.video_2_url}
-                required
-              /></label
-            >
-            <label class="upload-button full"
-              ><input type="file" name="video_2_upload" accept="video/*" /><span
-                >Upload video 2 (max 15 MB)</span
-              ></label
-            >
-          </div>
-        </div>
         <button class="button primary settings-save" type="submit">Save business details</button>
       </form>
+      <div class="settings-block settings-media">
+        <h3>Hero image & videos</h3>
+        <p class="upload-help">Tap a box to add or change it. It saves straight away.</p>
+        <div class="product-media-admin">
+          <MediaTile
+            kind="settings"
+            id={1}
+            field="hero_image_url"
+            src={data.settings.hero_image_url}
+            label="Hero background"
+            removable
+          />
+          <MediaTile
+            kind="settings"
+            id={1}
+            field="video_1_url"
+            src={data.settings.video_1_url}
+            label="Video 1"
+            video
+          />
+          <MediaTile
+            kind="settings"
+            id={1}
+            field="video_2_url"
+            src={data.settings.video_2_url}
+            label="Video 2"
+            video
+          />
+        </div>
+      </div>
     </section>
   {/if}
 </main>
@@ -613,14 +612,13 @@
   }
   .admin-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 7px;
-    overflow-x: auto;
     margin-bottom: 14px;
     padding: 5px;
     border: 1px solid var(--line);
     border-radius: 15px;
     background: var(--white);
-    scrollbar-width: none;
   }
   .admin-tabs button {
     display: flex;
@@ -645,10 +643,15 @@
     display: grid;
     min-width: 21px;
     height: 21px;
+    padding: 0 6px;
     place-items: center;
-    border-radius: 50%;
+    border-radius: 999px;
     background: rgba(255, 255, 255, 0.2);
     font-size: 0.65rem;
+  }
+  .admin-tabs .tab-new {
+    background: var(--cod);
+    color: var(--cod-ink);
   }
   .admin-panel {
     padding: 22px 16px;
@@ -809,6 +812,15 @@
     display: grid;
     gap: 14px;
   }
+  .product-details {
+    display: grid;
+    gap: 13px;
+  }
+  .settings-media {
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+  }
   .edit-product {
     display: grid;
     gap: 13px;
@@ -817,78 +829,17 @@
     border-radius: 16px;
     background: var(--surface);
   }
-  .edit-product-image {
-    overflow: hidden;
-    aspect-ratio: 1;
-    border-radius: 13px;
-    background: var(--soft);
-  }
-  .edit-product-image img,
-  .edit-product-image video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
   .product-media-admin {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 7px;
-  }
-  .product-media-admin > div {
-    display: grid;
-    gap: 5px;
-  }
-  .product-media-admin span {
-    color: var(--muted);
-    font-size: 0.58rem;
-    font-weight: 750;
-    text-align: center;
-  }
-  .video-preview {
-    position: relative;
-  }
-  .video-preview b {
-    position: absolute;
-    inset: 50% auto auto 50%;
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--scrim);
-    color: var(--white);
-    font-size: 0.62rem;
-    transform: translate(-50%, -50%);
-  }
-  .media-fields {
-    display: grid;
-    gap: 9px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    max-width: 560px;
   }
   .upload-help {
-    margin: -4px 0 0;
+    margin: 0;
     color: var(--muted);
-    font-size: 0.68rem;
+    font-size: 0.8rem;
     line-height: 1.4;
-  }
-  .upload-button {
-    position: relative;
-    display: grid;
-    min-height: 44px;
-    place-items: center;
-    overflow: hidden;
-    border: 1px dashed var(--muted);
-    border-radius: 11px;
-    background: var(--sky);
-    color: var(--blue);
-    font-size: 0.75rem;
-    font-weight: 800;
-    cursor: pointer;
-  }
-  .upload-button input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: pointer;
   }
   .two-fields,
   .settings-grid {
@@ -1084,5 +1035,60 @@
     .settings-grid .full {
       grid-column: auto;
     }
+  }
+  .review-admin {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+  .add-review {
+    margin-bottom: 18px;
+  }
+  .add-review h3,
+  .add-review p {
+    margin: 0;
+  }
+  .add-review .button {
+    justify-self: start;
+  }
+  .review-admin-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+  }
+  .review-admin-head small {
+    color: var(--muted);
+  }
+  .review-state {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--cod);
+    color: var(--cod-ink);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+  .review-state.live {
+    background: var(--brand-tint);
+    color: var(--brand-deep);
+  }
+  .review-admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .review-delete {
+    margin-left: auto;
+    padding: 8px 4px;
+    border: 0;
+    background: none;
+    color: var(--danger);
+    font-weight: 700;
+    cursor: pointer;
   }
 </style>
