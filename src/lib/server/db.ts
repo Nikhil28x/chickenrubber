@@ -18,9 +18,10 @@ import {
 } from './schema';
 import { PRODUCT_COLUMNS, PRODUCT_MEDIA_COLUMNS, SETTINGS_COLUMNS } from './media';
 
+import { getRequestEvent } from '$app/server';
+
 const { Pool } = pg;
 
-let pool: pg.Pool | undefined;
 let initialized: Promise<void> | undefined;
 
 export const defaultSettings: SiteSettings = {
@@ -88,16 +89,23 @@ export async function withMedia(products: ProductRow[]): Promise<Product[]> {
   });
 }
 
+// Cloudflare Workers can't reuse a connection from one request in the next, so each
+// request opens its own and hooks.server.ts closes it once the response is ready.
 function getPool() {
   if (!DATABASE_URL) return undefined;
-  if (!pool) {
-    pool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
-      max: 5
-    });
-  }
-  return pool;
+  const { locals } = getRequestEvent();
+  locals.db ??= new Pool({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    max: 3
+  });
+  return locals.db;
+}
+
+export function closeDb(locals: App.Locals) {
+  const db = locals.db;
+  locals.db = undefined;
+  db?.end().catch(() => {});
 }
 
 export async function initDb() {

@@ -524,7 +524,7 @@
     </div>
   </section>
 
-  <ReviewsSection reviews={data.reviews} />
+  <ReviewsSection reviews={data.reviews} sample={data.sampleReviews} />
 </main>
 
 <footer class="site-footer">
@@ -587,6 +587,7 @@
   <div class="container footer-terms">
     <span>No return, no exchange</span>
     <span>No guarantee, no warranty</span>
+    <span>All disputes are subject to Mysore jurisdiction only</span>
   </div>
   <div class="container footer-bottom">
     <span>© {new Date().getFullYear()} {data.settings.business_name}. All rights reserved.</span>

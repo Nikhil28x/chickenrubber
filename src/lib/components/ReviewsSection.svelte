@@ -2,7 +2,7 @@
   import type { Review } from '../types';
 
   // Approved customer reviews, plus the form for sending a new one.
-  let { reviews }: { reviews: Review[] } = $props();
+  let { reviews, sample = false }: { reviews: Review[]; sample?: boolean } = $props();
 
   const CARD_SECONDS = 8;
   const MIN_CARDS = 8;
@@ -30,10 +30,6 @@
     return [...row, ...row];
   });
   const seconds = $derived((loop.length / 2) * CARD_SECONDS);
-
-  function stars(rating: number) {
-    return '★'.repeat(rating) + '☆'.repeat(5 - rating);
-  }
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -67,6 +63,7 @@
   <div class="container">
     <div class="section-heading centered">
       <h2>{reviews.length ? 'What our customers say' : 'Bought from us before?'}</h2>
+      {#if sample}<p class="sample-note"></p>{/if}
     </div>
   </div>
 
@@ -79,9 +76,14 @@
             class:copy={index >= reviews.length}
             aria-hidden={index >= reviews.length}
           >
-            <span class="review-stars" role="img" aria-label={`${review.rating} out of 5 stars`}
-              >{stars(review.rating)}</span
-            >
+            <div class="review-rating">
+              <span class="review-stars" role="img" aria-label={`${review.rating} out of 5 stars`}
+                >★★★★★<span class="stars-on" style={`width: ${(review.rating / 5) * 100}%`}
+                  >★★★★★</span
+                ></span
+              >
+              <strong>{review.rating.toFixed(1)}</strong>
+            </div>
             <p>{review.comment}</p>
             <footer>
               <strong>{review.customer_name}</strong>
@@ -191,7 +193,8 @@
     justify-content: flex-start;
     width: max-content;
     padding: 0;
-    animation: reviews-scroll var(--seconds) linear infinite;
+    /* Reversed so the cards travel left to right. */
+    animation: reviews-scroll var(--seconds) linear infinite reverse;
   }
   .scrolling:hover .reviews-track {
     animation-play-state: paused;
@@ -213,10 +216,45 @@
     border-radius: var(--radius);
     background: var(--surface);
   }
+  .review-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .review-rating strong {
+    color: var(--ink);
+    font-size: 0.95rem;
+  }
   .review-stars {
-    color: var(--accent);
+    position: relative;
+    display: inline-block;
+    color: var(--line-strong);
     font-size: 1.15rem;
     letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  /* The gold layer is cut to the rating, so 4.2 shows a fifth of the last star. */
+  .stars-on {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    color: var(--accent);
+  }
+  .sample-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .section.reviews-section {
+    padding-top: 32px;
+  }
+  .reviews-section .section-heading {
+    margin-bottom: 20px;
+  }
+  .reviews-section .section-heading h2 {
+    margin-bottom: 0;
   }
   .review-card p {
     flex: 1;

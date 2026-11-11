@@ -1,7 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import adapter from '@sveltejs/adapter-vercel';
+import adapter from '@sveltejs/adapter-cloudflare';
 import { defineConfig } from 'vite';
 
 export default defineConfig(async () => ({
-  plugins: [await sveltekit({ adapter: adapter({ runtime: 'nodejs24.x' }) })]
+  plugins: [await sveltekit({ adapter: adapter() })]
 }));

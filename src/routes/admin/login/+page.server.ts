@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createAdminToken, verifyAdmin } from '../../../lib/server/auth';
 import type { Actions, PageServerLoad } from './$types';
+import { dev } from '$app/env';
 
 export const load: PageServerLoad = async ({ locals }) => {
   if (locals.admin) redirect(303, '/admin');
@@ -20,7 +21,7 @@ export const actions: Actions = {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: !dev,
       maxAge: 60 * 60 * 12
     });
     redirect(303, '/admin');

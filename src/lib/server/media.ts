@@ -12,7 +12,7 @@ export const MEDIA_TABLES: Record<MediaKind, string> = {
   settings: 'site_settings'
 };
 
-// Vercel rejects request bodies over 4.5 MB, so one file must stay under that.
+// Files are stored in the database and held in memory while served, so keep each small.
 export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export function isMediaField(kind: string, field: string): kind is MediaKind {
