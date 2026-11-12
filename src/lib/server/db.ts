@@ -19,6 +19,8 @@ import {
 import { PRODUCT_COLUMNS, PRODUCT_MEDIA_COLUMNS, SETTINGS_COLUMNS } from './media';
 
 import { getRequestEvent } from '$app/server';
+import { dev } from '$app/env';
+import { env as cloudflare } from 'cloudflare:workers';
 
 const { Pool } = pg;
 
@@ -80,8 +82,12 @@ export async function withMedia(products: ProductRow[]): Promise<Product[]> {
      WHERE product_id = ANY($1::int[]) ORDER BY sort_order, id`,
     [products.map((product) => product.id)]
   );
+  return attachMedia(products, media.rows);
+}
+
+function attachMedia(products: ProductRow[], media: (ProductMedia & { product_id: number })[]) {
   return products.map((product) => {
-    const items = media.rows
+    const items = media
       .filter((row) => row.product_id === product.id)
       .map(({ id, kind, url }) => ({ id, kind, url }));
     const mainPhoto = items.find((item) => item.kind === 'image')?.url;
@@ -91,15 +97,27 @@ export async function withMedia(products: ProductRow[]): Promise<Product[]> {
 
 // Cloudflare Workers can't reuse a connection from one request in the next, so each
 // request opens its own and hooks.server.ts closes it once the response is ready.
+// On Cloudflare the connection goes through Hyperdrive, which keeps warm connections
+// to the database so opening one is quick. Local dev connects to DATABASE_URL directly.
 function getPool() {
-  if (!DATABASE_URL) return undefined;
   const { locals } = getRequestEvent();
-  locals.db ??= new Pool({
-    connectionString: DATABASE_URL,
-    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
-    max: 3
-  });
+  const hyperdrive = dev ? undefined : hyperdriveUrl();
+  if (!hyperdrive && !DATABASE_URL) return undefined;
+  locals.db ??= new Pool(
+    hyperdrive
+      ? { connectionString: hyperdrive, max: 5 }
+      : {
+          connectionString: DATABASE_URL,
+          ssl: DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
+          max: 3
+        }
+  );
   return locals.db;
+}
+
+function hyperdriveUrl() {
+  const binding = (cloudflare as { HYPERDRIVE?: { connectionString: string } }).HYPERDRIVE;
+  return binding?.connectionString;
 }
 
 export function closeDb(locals: App.Locals) {
@@ -131,26 +149,33 @@ export async function getStorefront() {
 
   try {
     await initDb();
-    const [settingsResult, framesResult, productsResult, reviewsResult] = await Promise.all([
-      db.query<SiteSettings>(`SELECT ${SETTINGS_COLUMNS} FROM site_settings WHERE id = 1`),
-      db.query<Frame>(
-        `SELECT id, title, subtitle, is_active, sort_order FROM frames
+    // All five queries run at once: each trip to the database takes a while.
+    const [settingsResult, framesResult, productsResult, reviewsResult, mediaResult] =
+      await Promise.all([
+        db.query<SiteSettings>(`SELECT ${SETTINGS_COLUMNS} FROM site_settings WHERE id = 1`),
+        db.query<Frame>(
+          `SELECT id, title, subtitle, is_active, sort_order FROM frames
          WHERE is_active = TRUE ORDER BY sort_order, id`
-      ),
-      db.query<ProductRow>(
-        `SELECT ${PRODUCT_COLUMNS} FROM products p
+        ),
+        db.query<ProductRow>(
+          `SELECT ${PRODUCT_COLUMNS} FROM products p
          WHERE is_active = TRUE AND EXISTS (
            SELECT 1 FROM frames f WHERE f.id = p.frame_id AND f.is_active = TRUE
          )
          ORDER BY sort_order, id`
-      ),
-      db.query<Review>(
-        `SELECT id, customer_name, location, rating, comment FROM reviews
+        ),
+        db.query<Review>(
+          `SELECT id, customer_name, location, rating, comment FROM reviews
          WHERE is_approved = TRUE ORDER BY created_at DESC, id DESC LIMIT 30`
-      )
-    ]);
+        ),
+        db.query<ProductMedia & { product_id: number }>(
+          `SELECT ${PRODUCT_MEDIA_COLUMNS} FROM product_media
+         WHERE product_id IN (SELECT id FROM products WHERE is_active = TRUE)
+         ORDER BY sort_order, id`
+        )
+      ]);
 
-    const products = await withMedia(productsResult.rows);
+    const products = attachMedia(productsResult.rows, mediaResult.rows);
     const frames = framesResult.rows
       .map((frame) => ({
         ...frame,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import ShareButton from './ShareButton.svelte';
 
   // The photos and videos on a product card: swipe or use the arrows to see
   // them all, and tap one to open it full screen.
@@ -9,6 +10,8 @@
     eager = false,
     label,
     onopen,
+    shareLink,
+    shareText = name,
     children
   }: {
     media: { type: 'image' | 'video'; src: string }[];
@@ -16,6 +19,9 @@
     eager?: boolean;
     label: string;
     onopen: (index: number) => void;
+    /** Link for sharing the photo or video at this position. */
+    shareLink?: (index: number) => string;
+    shareText?: string;
     children?: Snippet;
   } = $props();
 
@@ -55,6 +61,11 @@
     {/each}
   </div>
   {@render children?.()}
+  {#if shareLink && media[current]}
+    <div class="photo-share">
+      <ShareButton src={media[current].src} link={shareLink(current)} text={shareText} />
+    </div>
+  {/if}
   {#if several}
     <button
       class="photo-arrow prev"
@@ -131,6 +142,11 @@
   }
   .photo-arrow.prev {
     left: 8px;
+  }
+  .photo-share {
+    position: absolute;
+    top: 8px;
+    right: 8px;
   }
   .photo-arrow.next {
     right: 8px;

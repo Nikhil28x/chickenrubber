@@ -4,7 +4,7 @@
   let { form }: { form: ActionData } = $props();
 </script>
 
-<svelte:head><title>Admin sign in | Naazare Enterprises</title></svelte:head>
+<svelte:head><title>Admin sign in | Raghav Kitchen Equipments</title></svelte:head>
 
 <main class="login-shell">
   <section class="login-card">

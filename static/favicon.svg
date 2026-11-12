@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Naazare Enterprises">
-  <path d="M32 3 57.5 17.5v29L32 61 6.5 46.5v-29Z" fill="#4D6A4E" stroke="#4D6A4E" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M32 9.5 52 21v22L32 54.5 12 43V21Z" fill="none" stroke="#E2B84F" stroke-width="1.6" stroke-linejoin="round" opacity=".9"/>
-  <path d="M15 20.5h5v23h-5zM27 20.5h5v23h-5zM36 20.5h5v23h-5zM36 20.5h13v4.5H36zM36 39h13v4.5H36z" fill="#fff"/>
-  <path d="M15 20.5h5l12 23h-5ZM41 29.75h6v4.5h-6z" fill="#E2B84F"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Raghav Kitchen Equipments">
+  <path d="M24.96 5.73 L28.17 5.07 L29.29 1.62 L34.71 1.62 L35.83 5.07 L39.04 5.73 L42.15 6.76 L44.84 4.34 L49.54 7.05 L48.78 10.60 L51.23 12.77 L53.40 15.22 L56.95 14.46 L59.66 19.16 L57.24 21.85 L58.27 24.96 L58.93 28.17 L62.38 29.29 L62.38 34.71 L58.93 35.83 L58.27 39.04 L57.24 42.15 L59.66 44.84 L56.95 49.54 L53.40 48.78 L51.23 51.23 L48.78 53.40 L49.54 56.95 L44.84 59.66 L42.15 57.24 L39.04 58.27 L35.83 58.93 L34.71 62.38 L29.29 62.38 L28.17 58.93 L24.96 58.27 L21.85 57.24 L19.16 59.66 L14.46 56.95 L15.22 53.40 L12.77 51.23 L10.60 48.78 L7.05 49.54 L4.34 44.84 L6.76 42.15 L5.73 39.04 L5.07 35.83 L1.62 34.71 L1.62 29.29 L5.07 28.17 L5.73 24.96 L6.76 21.85 L4.34 19.16 L7.05 14.46 L10.60 15.22 L12.77 12.77 L15.22 10.60 L14.46 7.05 L19.16 4.34 L21.85 6.76Z" fill="#4D6A4E" stroke="#4D6A4E" stroke-width="1.2" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="23.6" fill="none" stroke="#E2B84F" stroke-width="1.6" opacity=".9"/>
+  <path d="M14.5 23h6a4.5 4.5 0 0 1 0 9h-2.4v9h-3.6Z M18.1 26.2v2.6h2.5a1.3 1.3 0 0 0 0-2.6Z" fill="#fff" fill-rule="evenodd"/>
+  <path d="M19.5 32h3.6l2.6 9h-3.6Z M27.5 23h3.6v18h-3.6Z M31.1 30.3 35.2 23h3.9l-8 13.5Z M41.6 23h8.4v3.4h-4.8v4h4v3.2h-4v4h4.8V41h-8.4Z" fill="#fff"/>
+  <path d="M33.2 32.4 35.5 29.5 39.8 41h-4Z" fill="#E2B84F"/>
 </svg>

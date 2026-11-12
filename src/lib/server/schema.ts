@@ -2,9 +2,13 @@ import type pg from 'pg';
 
 // Shared by the app (lazy init on first request) and `npm run db:setup`.
 // Every step is idempotent, so it is safe to run on each cold start.
+// Bump SCHEMA_VERSION whenever you change migrate(), so live sites run it again;
+// otherwise a cold start only checks the stored version (one quick query).
+const SCHEMA_VERSION = 1;
 
-export const BUSINESS_NAME = 'Naazare Enterprises';
-const OLD_BUSINESS_NAME = 'Raghav Chicken Machine Rubber';
+export const BUSINESS_NAME = 'Raghav Kitchen Equipments';
+// Earlier names, renamed automatically unless the owner chose another name in admin.
+const OLD_BUSINESS_NAMES = ['Raghav Chicken Machine Rubber', 'Naazare Enterprises'];
 const OLD_HERO_IMAGE = '/media/raghav-brand-poster.png';
 export const PLACEHOLDER_IMAGE = '/products/placeholder.svg';
 export const PRODUCTS_PER_FRAME = 4;
@@ -69,6 +73,13 @@ export async function insertPlaceholderProducts(db: Queryable, frameId: number, 
 }
 
 export async function migrate(pool: pg.Pool) {
+  try {
+    const stored = await pool.query<{ version: number }>('SELECT version FROM schema_version');
+    if (stored.rows[0]?.version === SCHEMA_VERSION) return;
+  } catch {
+    // No version table yet: run the full setup below.
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -194,10 +205,10 @@ export async function migrate(pool: pg.Pool) {
     );
     await client.query(
       `UPDATE site_settings SET
-         business_name = CASE WHEN business_name = $1 THEN $2 ELSE business_name END,
+         business_name = CASE WHEN business_name = ANY($1) THEN $2 ELSE business_name END,
          hero_image_url = CASE WHEN hero_image_url = $3 THEN '' ELSE hero_image_url END
-       WHERE business_name = $1 OR hero_image_url = $3`,
-      [OLD_BUSINESS_NAME, BUSINESS_NAME, OLD_HERO_IMAGE]
+       WHERE business_name = ANY($1) OR hero_image_url = $3`,
+      [OLD_BUSINESS_NAMES, BUSINESS_NAME, OLD_HERO_IMAGE]
     );
 
     const productCount = await client.query<{ count: number }>(
@@ -255,6 +266,10 @@ export async function migrate(pool: pg.Pool) {
       [PLACEHOLDER_IMAGE]
     );
     await client.query('UPDATE products SET media_migrated = TRUE WHERE NOT media_migrated');
+
+    await client.query('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
+    await client.query('DELETE FROM schema_version');
+    await client.query('INSERT INTO schema_version (version) VALUES ($1)', [SCHEMA_VERSION]);
 
     await client.query('COMMIT');
   } catch (error) {

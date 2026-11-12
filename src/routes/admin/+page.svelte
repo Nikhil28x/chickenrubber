@@ -62,7 +62,7 @@
   >
 {/snippet}
 
-<svelte:head><title>Store admin | Naazare Enterprises</title></svelte:head>
+<svelte:head><title>Store admin | Raghav Kitchen Equipments</title></svelte:head>
 
 <header class="admin-topbar">
   <Logo href="/admin" tagline="Store admin" />
@@ -174,7 +174,7 @@
                   class="button whatsapp"
                   target="_blank"
                   rel="noreferrer"
-                  href={`https://wa.me/91${order.mobile_primary}?text=${encodeURIComponent(`Hello ${order.customer_name}, this is Naazare Enterprises regarding your callback request #${order.order_number}. `)}`}
+                  href={`https://wa.me/91${order.mobile_primary}?text=${encodeURIComponent(`Hello ${order.customer_name}, this is Raghav Kitchen Equipments regarding your callback request #${order.order_number}. `)}`}
                   >WhatsApp customer</a
                 >
               </form>

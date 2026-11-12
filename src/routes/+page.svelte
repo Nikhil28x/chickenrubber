@@ -3,9 +3,11 @@
   import Logo from '../lib/components/Logo.svelte';
   import ProductPhotos from '../lib/components/ProductPhotos.svelte';
   import ReviewsSection from '../lib/components/ReviewsSection.svelte';
+  import ShareButton from '../lib/components/ShareButton.svelte';
   import { INSTAGRAM_URL, YOUTUBE_URL } from '../lib/social';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
+  import { onMount } from 'svelte';
 
   let { data }: { data: PageData } = $props();
 
@@ -56,6 +58,37 @@
     ].filter((video) => video.src)
   );
 
+  // A shared link such as /?product=3&media=1 opens that photo or video.
+  const sharedProduct = $derived(
+    data.share.productId ? allProducts.find((item) => item.id === data.share.productId) : undefined
+  );
+  const sharedMedia = $derived(
+    sharedProduct ? productMedia(sharedProduct)[data.share.mediaIndex] : undefined
+  );
+  const previewImage = $derived(
+    new URL(
+      sharedMedia?.type === 'image'
+        ? sharedMedia.src
+        : sharedProduct?.image_url || data.settings.hero_image_url || allProducts[0]?.image_url || '/',
+      data.share.origin
+    ).href
+  );
+
+  onMount(() => {
+    if (sharedProduct) {
+      const count = productMedia(sharedProduct).length;
+      openProduct(sharedProduct, Math.min(data.share.mediaIndex, count - 1));
+    }
+  });
+
+  function shareLink(product: Product, mediaIndex: number) {
+    return `/?product=${product.id}&media=${mediaIndex}`;
+  }
+
+  function shareText(product: Product) {
+    return `${product.name} – ${data.settings.business_name}`;
+  }
+
   $effect(() => {
     if (typeof document === 'undefined') return;
     document.body.style.overflow = activeProduct ? 'hidden' : '';
@@ -89,8 +122,8 @@
 
   function whatsappLink(product?: Product) {
     const message = product
-      ? `Hello Naazare Enterprises, I am interested in ${product.name}. Please share the price.`
-      : 'Hello Naazare Enterprises, I would like to know more about your products.';
+      ? `Hello Raghav Kitchen Equipments, I am interested in ${product.name}. Please share the price.`
+      : 'Hello Raghav Kitchen Equipments, I would like to know more about your products.';
     return `https://wa.me/91${whatsappNumber}?text=${encodeURIComponent(message)}`;
   }
 
@@ -111,7 +144,8 @@
   }
 
   function handleGalleryKey(event: KeyboardEvent) {
-    if (!activeProduct) return;
+    // Keys pressed in the share panel belong to the panel.
+    if (!activeProduct || document.querySelector('dialog[open]')) return;
     if (event.key === 'Escape') closeProduct();
     if (event.key === 'ArrowRight') showMedia(1);
     if (event.key === 'ArrowLeft') showMedia(-1);
@@ -171,8 +205,23 @@
   <title>{data.settings.business_name} | Commercial Kitchen Equipment Since 2004</title>
   <meta
     name="description"
-    content="Naazare Enterprises — dealers in commercial kitchen equipment since 2004. Chicken feather cleaning machines, chicken cutting machines, rubbers and bushes, commercial mixers, grinders and dough kneading machines."
+    content="Raghav Kitchen Equipments (a unit of Naazare Enterprises) — dealers in commercial kitchen equipment since 2004. Chicken feather cleaning machines, chicken cutting machines, rubbers and bushes, commercial mixers, grinders and dough kneading machines."
   />
+  <!-- Link previews on WhatsApp and Facebook. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content={data.settings.business_name} />
+  <meta
+    property="og:title"
+    content={sharedProduct ? shareText(sharedProduct) : data.settings.business_name}
+  />
+  <meta
+    property="og:description"
+    content={sharedProduct?.description ||
+      'Commercial kitchen equipment since 2004. Cash on delivery across India.'}
+  />
+  <meta property="og:image" content={previewImage} />
+  <meta property="og:url" content={data.share.url} />
+  <meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
 <div class="infobar">
@@ -244,7 +293,8 @@
       <div class="hero-head">
         <div class="hero-copy">
           <p class="eyebrow">Commercial kitchen equipment · Since 2004</p>
-          <h1><span>Naazare</span> Enterprises</h1>
+          <h1><span>Raghav</span> Kitchen Equipments</h1>
+          <p class="hero-unit">A unit of Naazare Enterprises</p>
           <p class="hero-lead">
             Dependable machines and genuine spare parts for poultry shops, hotels, bakeries and
             commercial kitchens.
@@ -277,7 +327,7 @@
     <div class="container stats-inner">
       <div><strong>2004</strong><span>Established and trusted by kitchens</span></div>
       <div><strong>{yearsInTrade}+</strong><span>Years of experience in the trade</span></div>
-      <div><strong>{productLines.length}+</strong><span>Product lines and growing</span></div>
+      <div><strong>20+</strong><span>Product lines and growing</span></div>
       <div><strong>COD</strong><span>Cash on delivery to your doorstep</span></div>
     </div>
   </section>
@@ -286,7 +336,7 @@
     <div class="container about">
       <div class="about-media">
         {#if aboutImages[0]}
-          <img class="about-main" src={aboutImages[0]} alt="Naazare Enterprises product" />
+          <img class="about-main" src={aboutImages[0]} alt="Raghav Kitchen Equipments product" />
         {/if}
         {#if aboutImages[1]}
           <img class="about-inset" src={aboutImages[1]} alt="" loading="lazy" />
@@ -295,7 +345,8 @@
       </div>
       <div class="about-copy">
         <p class="eyebrow-text">About us</p>
-        <h2>Naazare Enterprises</h2>
+        <h2>Raghav Kitchen Equipments</h2>
+        <p class="about-unit">A unit of Naazare Enterprises</p>
         <p class="about-lead">Dealers in commercial kitchen equipment since 2004.</p>
         <p>
           For over two decades we have supplied hard-working machines and genuine spare parts to
@@ -332,6 +383,8 @@
                   eager={frameIndex === 0 && index < 2}
                   label={product.media.length ? mediaLabel(product) : ''}
                   onopen={(mediaIndex) => openProduct(product, mediaIndex)}
+                  shareLink={(mediaIndex) => shareLink(product, mediaIndex)}
+                  shareText={shareText(product)}
                 >
                   {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
                       class="stock out">Out of stock</span
@@ -367,7 +420,6 @@
         <div class="section-heading centered light">
           <p class="eyebrow-text">See it working</p>
           <h2>Know what arrives</h2>
-          <p>Short, clear videos of our products — made for your phone.</p>
         </div>
         <div class="video-grid" class:single={videos.length === 1}>
           {#each videos as video, index}
@@ -380,7 +432,16 @@
                   label="English"
                 />
               </video>
-              <div><span>Film 0{index + 1}</span><strong>{video.title}</strong></div>
+              <div>
+                <p><span>Film 0{index + 1}</span><strong>{video.title}</strong></p>
+                <ShareButton
+                  src={video.src}
+                  link="/#videos"
+                  text={`${video.title} – ${data.settings.business_name}`}
+                  variant="dark"
+                  showLabel
+                />
+              </div>
             </article>
           {/each}
         </div>
@@ -403,6 +464,18 @@
     <div class="container callback">
       <div class="section-heading centered">
         <h2>Contact us</h2>
+      </div>
+      <div class="contact-brand">
+        <strong>Raghav Kitchen Equipments</strong>
+        <small>A unit of Naazare Enterprises</small>
+        <p class="contact-address">
+          <Icon name="pin" size={16} />
+          {#if data.settings.address}
+            <span>{data.settings.address}</span>
+          {:else}
+            <span>Mysore<br />570011</span>
+          {/if}
+        </p>
       </div>
       <div class="callback-card">
         {#if requestNumber}
@@ -567,9 +640,9 @@
     <div>
       <h3>Contact</h3>
       <ul class="footer-contact">
-        {#if data.settings.address}<li>
-            <Icon name="pin" size={15} />{data.settings.address}
-          </li>{/if}
+        <li>
+          <Icon name="pin" size={15} />{data.settings.address || 'Mysore 570011'}
+        </li>
         <li><Icon name="phone" size={15} /><a href={`tel:${phone}`}>{phoneLabel}</a></li>
         {#if data.settings.secondary_phone}<li>
             <Icon name="phone" size={15} /><a href={`tel:${data.settings.secondary_phone}`}
@@ -585,8 +658,6 @@
     </div>
   </div>
   <div class="container footer-terms">
-    <span>No return, no exchange</span>
-    <span>No guarantee, no warranty</span>
     <span>All disputes are subject to Mysore jurisdiction only</span>
   </div>
   <div class="container footer-bottom">
@@ -615,6 +686,16 @@
       {/if}
       <button class="viewer-close" type="button" onclick={closeProduct} aria-label="Close">×</button
       >
+      {#if selectedMedia}
+        <div class="viewer-share">
+          <ShareButton
+            src={selectedMedia.src}
+            link={shareLink(viewedProduct, activeMediaIndex)}
+            text={shareText(viewedProduct)}
+            showLabel
+          />
+        </div>
+      {/if}
       {#if media.length > 1}
         <button
           class="viewer-nav prev"

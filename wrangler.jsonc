@@ -7,10 +7,19 @@
   "compatibility_date": "2026-11-01",
   // Lets the pg database driver and node:crypto run on Workers.
   "compatibility_flags": ["nodejs_compat"],
+  // Keep the …workers.dev address working as well as the site's own domain.
+  "workers_dev": true,
+  // The site's own web address (DNS is managed in this Cloudflare account).
+  "routes": [
+    { "pattern": "raghavchickenrubber.com", "custom_domain": true },
+    { "pattern": "www.raghavchickenrubber.com", "custom_domain": true }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare"
   },
+  // Keeps warm connections to the Neon database so pages load quickly.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "216eb781d6464b65ba149234872bd7aa" }],
   "observability": {
     "enabled": true
   }
