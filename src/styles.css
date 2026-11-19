@@ -1688,3 +1688,46 @@ a.infobar-item:hover {
     display: none;
   }
 }
+
+/* ---------- Language picker ---------- */
+
+.hero-lang {
+  display: flex;
+  justify-content: flex-end;
+  margin: -36px 0 20px;
+}
+/* Wide letter spacing breaks up Indian scripts, so it is dropped outside English,
+   and the smallest labels grow a little so the letters stay readable. */
+html:not([lang='en']) body *:not(.brand *) {
+  letter-spacing: normal;
+}
+html:not([lang='en']) :is(.eyebrow, .eyebrow-text) {
+  font-size: 0.9rem;
+}
+html:not([lang='en']) :is(.hero-unit, .about-unit) {
+  font-size: 0.82rem;
+}
+html:not([lang='en']) :is(.seal-since, .seal-label) {
+  font-size: 0.78rem;
+}
+html:not([lang='en']) .stock {
+  font-size: 0.8rem;
+}
+.desktop-nav a {
+  white-space: nowrap;
+}
+/* Longer words for "Call" don't fit beside the logo on phones, so only the icon shows. */
+html:not([lang='en']) .header-call-label {
+  display: none;
+}
+html:not([lang='en']) .header-call-mobile {
+  padding-inline: 14px;
+}
+@media (max-width: 640px) {
+  .hero-lang {
+    margin: -24px 0 40px;
+  }
+  html:not([lang='en']) :is(.seal-since, .seal-label) {
+    font-size: 0.56rem;
+  }
+}

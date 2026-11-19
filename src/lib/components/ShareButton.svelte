@@ -1,5 +1,8 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+  import { useI18n } from '../i18n';
+
+  const t = useI18n();
 
   // A Share button for one photo or video. It opens a small panel with
   // WhatsApp, Facebook, Instagram and Copy link.
@@ -88,7 +91,7 @@
         if (error instanceof DOMException && error.name === 'AbortError') return;
       }
     }
-    await copy('Link copied. Open Instagram and paste it into a message or your story.');
+    await copy(t('instagramCopied'));
   }
 
   async function more() {
@@ -100,12 +103,12 @@
     }
   }
 
-  async function copy(done = 'Link copied.') {
+  async function copy(done = t('linkCopied')) {
     try {
       await navigator.clipboard.writeText(absolute(link));
       message = done;
     } catch {
-      message = `Copy this link: ${absolute(link)}`;
+      message = t('copyThisLink', { url: absolute(link) });
     }
   }
 
@@ -119,8 +122,8 @@
   class:labelled={showLabel}
   type="button"
   onclick={open}
-  aria-label="Share"
-  ><Icon name="share" size={showLabel ? 17 : 18} />{#if showLabel}Share{/if}</button
+  aria-label={t('share')}
+  ><Icon name="share" size={showLabel ? 17 : 18} />{#if showLabel}{t('share')}{/if}</button
 >
 
 <dialog
@@ -128,12 +131,12 @@
   class="share-sheet"
   onclick={backdrop}
   onkeydown={(event) => event.stopPropagation()}
-  aria-label="Share"
+  aria-label={t('share')}
 >
   <div class="sheet-inner">
     <div class="sheet-head">
-      <strong>Share</strong>
-      <button class="sheet-close" type="button" onclick={close} aria-label="Close">×</button>
+      <strong>{t('share')}</strong>
+      <button class="sheet-close" type="button" onclick={close} aria-label={t('close')}>×</button>
     </div>
     <div class="sheet-options">
       <button type="button" class="opt whatsapp" onclick={whatsapp}
@@ -146,11 +149,11 @@
         ><span><Icon name="instagram" size={22} /></span>Instagram</button
       >
       <button type="button" class="opt copy" onclick={() => copy()}
-        ><span><Icon name="link" size={22} /></span>Copy link</button
+        ><span><Icon name="link" size={22} /></span>{t('copyLink')}</button
       >
     </div>
     {#if canShareNatively}
-      <button type="button" class="sheet-more" onclick={more}>More apps…</button>
+      <button type="button" class="sheet-more" onclick={more}>{t('moreApps')}</button>
     {/if}
     <p class="sheet-message" aria-live="polite">{message}</p>
   </div>

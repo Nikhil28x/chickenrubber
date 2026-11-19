@@ -4,21 +4,38 @@
   import ProductPhotos from '../lib/components/ProductPhotos.svelte';
   import ReviewsSection from '../lib/components/ReviewsSection.svelte';
   import ShareButton from '../lib/components/ShareButton.svelte';
+  import LanguagePicker from '../lib/components/LanguagePicker.svelte';
+  import { LANG_COOKIE, setI18n, translator, type Lang } from '../lib/i18n';
   import { INSTAGRAM_URL, YOUTUBE_URL } from '../lib/social';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
-  import { onMount } from 'svelte';
+  import { untrack } from 'svelte';
+  import { afterNavigate, pushState, replaceState } from '$app/navigation';
+  import { page } from '$app/state';
 
   let { data }: { data: PageData } = $props();
 
-  const productLines = [
-    'Chicken feather cleaning machines',
-    'Chicken cutting machines',
-    'Rubbers & bushes',
-    'Commercial mixers',
-    'Grinders',
-    'Dough kneading machines'
-  ];
+  // The visitor's language; the server reads it from a cookie so the page
+  // arrives already translated.
+  // svelte-ignore state_referenced_locally
+  let lang = $state<Lang>(data.lang);
+  setI18n(() => lang);
+  const t = $derived(translator(lang));
+
+  function changeLanguage(next: Lang) {
+    lang = next;
+    document.documentElement.lang = next;
+    document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  const productLines = $derived([
+    t('line1'),
+    t('line2'),
+    t('line3'),
+    t('line4'),
+    t('line5'),
+    t('line6')
+  ]);
   const yearsInTrade = new Date().getFullYear() - 2004;
 
   let submitting = $state(false);
@@ -53,8 +70,8 @@
   const whatsappHref = $derived(whatsappLink());
   const videos = $derived(
     [
-      { src: data.settings.video_1_url, title: 'Rubber and washer' },
-      { src: data.settings.video_2_url, title: 'Close-up and flexibility' }
+      { src: data.settings.video_1_url, title: t('video1Title') },
+      { src: data.settings.video_2_url, title: t('video2Title') }
     ].filter((video) => video.src)
   );
 
@@ -69,13 +86,20 @@
     new URL(
       sharedMedia?.type === 'image'
         ? sharedMedia.src
-        : sharedProduct?.image_url || data.settings.hero_image_url || allProducts[0]?.image_url || '/',
+        : sharedProduct?.image_url ||
+            data.settings.hero_image_url ||
+            allProducts[0]?.image_url ||
+            '/',
       data.share.origin
     ).href
   );
 
-  onMount(() => {
-    if (sharedProduct) {
+  // Runs once the router is ready, so the history changes below take effect.
+  afterNavigate(({ type }) => {
+    if (type === 'enter' && sharedProduct) {
+      // Swap the shared link for the home page underneath, so Back from the
+      // viewer lands on the site rather than leaving it.
+      replaceState('/', {});
       const count = productMedia(sharedProduct).length;
       openProduct(sharedProduct, Math.min(data.share.mediaIndex, count - 1));
     }
@@ -101,23 +125,23 @@
     const media = product.media.map((item, index) => ({
       type: item.kind,
       src: item.url,
-      label: item.kind === 'video' ? 'Video' : `Photo ${index + 1}`
+      label: item.kind === 'video' ? t('video') : t('photoN', { n: index + 1 })
     }));
     // The main photo always opens first.
     const main = media.findIndex((item) => item.src === product.image_url);
     if (main > 0) media.unshift(...media.splice(main, 1));
     return media.length
       ? media
-      : [{ type: 'image' as const, src: product.image_url, label: 'Photo' }];
+      : [{ type: 'image' as const, src: product.image_url, label: t('photo') }];
   }
 
   function mediaLabel(product: Product) {
     const photos = product.media.filter((item) => item.kind === 'image').length;
     const videos = product.media.length - photos;
     const parts = [];
-    if (photos) parts.push(`${photos} photo${photos === 1 ? '' : 's'}`);
-    if (videos) parts.push(`${videos} video${videos === 1 ? '' : 's'}`);
-    return parts.join(' + ') || 'Photo';
+    if (photos) parts.push(photos === 1 ? t('photos1') : t('photosN', { n: photos }));
+    if (videos) parts.push(videos === 1 ? t('videos1') : t('videosN', { n: videos }));
+    return parts.join(' + ') || t('photo');
   }
 
   function whatsappLink(product?: Product) {
@@ -133,15 +157,29 @@
     activeMediaIndex = (activeMediaIndex + step + count) % count;
   }
 
+  // Opening the viewer adds a step to the browser history, so the phone's Back
+  // button closes the viewer instead of leaving the website.
   function openProduct(product: Product, mediaIndex = 0) {
+    if (!page.state.viewer) pushState('', { viewer: true });
     activeProduct = product;
     activeMediaIndex = mediaIndex;
   }
 
   function closeProduct() {
+    if (page.state.viewer) history.back();
+    else hideProduct();
+  }
+
+  function hideProduct() {
     activeProduct = null;
     activeMediaIndex = 0;
   }
+
+  // Back was pressed (or closeProduct stepped back): hide the viewer.
+  // Only page.state is watched, so opening the viewer can't close it again.
+  $effect(() => {
+    if (!page.state.viewer) untrack(hideProduct);
+  });
 
   function handleGalleryKey(event: KeyboardEvent) {
     // Keys pressed in the share panel belong to the panel.
@@ -163,10 +201,10 @@
         body: JSON.stringify({ ...form, product_id: Number(form.product_id) || null })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Could not send your request');
+      if (!response.ok) throw new Error(result.error || t('sendFailed'));
       requestNumber = result.requestNumber;
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Could not send your request';
+      errorMessage = error instanceof Error ? error.message : t('sendFailed');
     } finally {
       submitting = false;
     }
@@ -190,15 +228,17 @@
 
 {#snippet contactActions(product?: Product)}
   <div class="contact-actions">
-    <a class="button primary" href={`tel:${phone}`}><Icon name="phone" size={18} />Call us</a>
+    <a class="button primary" href={`tel:${phone}`}><Icon name="phone" size={18} />{t('callUs')}</a>
     <a class="button whatsapp" href={whatsappLink(product)} target="_blank" rel="noreferrer"
       ><Icon name="whatsapp" size={19} />WhatsApp</a
     >
   </div>
 {/snippet}
 
-{#snippet cashOnDelivery(label = 'Cash on delivery', large = false)}
-  <span class="cod" class:large><Icon name="check" size={large ? 20 : 15} />{label}</span>
+{#snippet cashOnDelivery(label = '', large = false)}
+  <span class="cod" class:large
+    ><Icon name="check" size={large ? 20 : 15} />{label || t('cod')}</span
+  >
 {/snippet}
 
 <svelte:head>
@@ -228,8 +268,7 @@
   <div class="container infobar-inner">
     <div class="infobar-details">
       <span class="infobar-item infobar-address"
-        ><Icon name="pin" size={18} />{data.settings.address ||
-          'Dealers in commercial kitchen equipment since 2004'}</span
+        ><Icon name="pin" size={18} />{data.settings.address || t('tagline')}</span
       >
       <a class="infobar-item infobar-phone" href={`tel:${phone}`}
         ><Icon name="phone" size={18} />{phoneLabel}</a
@@ -260,22 +299,22 @@
 
 <header class="topbar">
   <div class="container topbar-inner">
-    <Logo href="#home" />
+    <Logo href="#home" tagline={t('unit')} />
     <nav class="desktop-nav" aria-label="Main navigation">
-      <a href="#home">Home</a>
-      <a href="#about">About</a>
-      <a href="#products">Products</a>
-      <a href="#videos">Videos</a>
-      <a href="#callback">Contact</a>
+      <a href="#home">{t('home')}</a>
+      <a href="#about">{t('about')}</a>
+      <a href="#products">{t('products')}</a>
+      <a href="#videos">{t('videos')}</a>
+      <a href="#callback">{t('contact')}</a>
     </nav>
     <a class="header-call" href={`tel:${phone}`}>
       <span class="header-call-icon"><Icon name="chat" size={22} /></span>
       <span class="header-call-text"
-        ><small>Have any questions?</small><strong>Call: {phoneLabel}</strong></span
+        ><small>{t('questions')}</small><strong>{t('call')}: {phoneLabel}</strong></span
       >
     </a>
-    <a class="button primary header-call-mobile" href={`tel:${phone}`}
-      ><Icon name="phone" size={16} />Call</a
+    <a class="button primary header-call-mobile" href={`tel:${phone}`} aria-label={t('call')}
+      ><Icon name="phone" size={16} /><span class="header-call-label">{t('call')}</span></a
     >
   </div>
 </header>
@@ -290,34 +329,33 @@
       : undefined}
   >
     <div class="container hero-inner">
+      <div class="hero-lang">
+        <LanguagePicker {lang} label={t('language')} onchange={changeLanguage} />
+      </div>
       <div class="hero-head">
         <div class="hero-copy">
-          <p class="eyebrow">Commercial kitchen equipment · Since 2004</p>
+          <p class="eyebrow">{t('heroEyebrow')}</p>
           <h1><span>Raghav</span> Kitchen Equipments</h1>
-          <p class="hero-unit">A unit of Naazare Enterprises</p>
-          <p class="hero-lead">
-            Dependable machines and genuine spare parts for poultry shops, hotels, bakeries and
-            commercial kitchens.
-          </p>
-          {@render cashOnDelivery('Cash on delivery across India', true)}
+          <p class="hero-unit">{t('unit')}</p>
+          <p class="hero-lead">{t('heroLead')}</p>
+          {@render cashOnDelivery(t('codIndia'), true)}
           <div class="hero-actions">
-            <a class="button shop" href="#products">Shop now <Icon name="arrow" size={18} /></a>
+            <a class="button shop" href="#products"
+              >{t('shopNow')} <Icon name="arrow" size={18} /></a
+            >
             {@render contactActions()}
           </div>
         </div>
-        <div class="seal" aria-label={`${yearsInTrade} years of trust`}>
-          <span class="seal-since">Since 2004</span>
+        <div class="seal" aria-label={`${yearsInTrade} ${t('yearsOfTrust')}`}>
+          <span class="seal-since">{t('since2004')}</span>
           <strong>{yearsInTrade}</strong>
-          <span class="seal-label">Years of trust</span>
+          <span class="seal-label">{t('yearsOfTrust')}</span>
         </div>
       </div>
     </div>
     <div class="hero-band">
       <div class="container hero-band-inner">
-        <span
-          ><Icon name="truck" size={18} />{data.settings.address ||
-            'Delivery across India · Cash on delivery'}</span
-        >
+        <span><Icon name="truck" size={18} />{data.settings.address || t('deliveryCod')}</span>
         <a href={`tel:${phone}`}><Icon name="phone" size={16} />{allPhones}</a>
       </div>
     </div>
@@ -325,10 +363,10 @@
 
   <section class="stats" aria-label="Highlights">
     <div class="container stats-inner">
-      <div><strong>2004</strong><span>Established and trusted by kitchens</span></div>
-      <div><strong>{yearsInTrade}+</strong><span>Years of experience in the trade</span></div>
-      <div><strong>20+</strong><span>Product lines and growing</span></div>
-      <div><strong>COD</strong><span>Cash on delivery to your doorstep</span></div>
+      <div><strong>2004</strong><span>{t('statEstablished')}</span></div>
+      <div><strong>{yearsInTrade}+</strong><span>{t('statYears')}</span></div>
+      <div><strong>20+</strong><span>{t('statLines')}</span></div>
+      <div><strong>COD</strong><span>{t('statCod')}</span></div>
     </div>
   </section>
 
@@ -341,22 +379,20 @@
         {#if aboutImages[1]}
           <img class="about-inset" src={aboutImages[1]} alt="" loading="lazy" />
         {/if}
-        <div class="about-badge"><strong>{yearsInTrade}+</strong><span>Years of trust</span></div>
+        <div class="about-badge">
+          <strong>{yearsInTrade}+</strong><span>{t('yearsOfTrust')}</span>
+        </div>
       </div>
       <div class="about-copy">
-        <p class="eyebrow-text">About us</p>
+        <p class="eyebrow-text">{t('aboutUs')}</p>
         <h2>Raghav Kitchen Equipments</h2>
-        <p class="about-unit">A unit of Naazare Enterprises</p>
-        <p class="about-lead">Dealers in commercial kitchen equipment since 2004.</p>
-        <p>
-          For over two decades we have supplied hard-working machines and genuine spare parts to
-          poultry shops, hotels, bakeries and commercial kitchens. Every enquiry is handled
-          personally — we help you choose the right machine, share the price and arrange delivery.
-        </p>
-        <h3>Products include</h3>
+        <p class="about-unit">{t('unit')}</p>
+        <p class="about-lead">{t('tagline')}.</p>
+        <p>{t('aboutBody')}</p>
+        <h3>{t('productsInclude')}</h3>
         <ul class="product-lines">
           {#each productLines as line}<li><Icon name="check" size={16} />{line}</li>{/each}
-          <li class="more">…and more</li>
+          <li class="more">{t('andMore')}</li>
         </ul>
         {@render contactActions()}
       </div>
@@ -366,7 +402,7 @@
   <section class="section products" id="products">
     <div class="container">
       <div class="section-heading centered">
-        <h2>Our products</h2>
+        <h2>{t('ourProducts')}</h2>
       </div>
 
       {#each data.frames as frame, frameIndex}
@@ -386,24 +422,25 @@
                   shareLink={(mediaIndex) => shareLink(product, mediaIndex)}
                   shareText={shareText(product)}
                 >
-                  {#if product.stock > 0}<span class="stock">Available</span>{:else}<span
-                      class="stock out">Out of stock</span
+                  {#if product.stock > 0}<span class="stock">{t('available')}</span>{:else}<span
+                      class="stock out">{t('outOfStock')}</span
                     >{/if}
                 </ProductPhotos>
                 <div class="product-info">
                   <h4>{product.name}</h4>
                   <div class="product-meta">
                     <div>
-                      <span>Price</span><strong
-                        >{product.price > 0 ? money(product.price) : 'Ask price'}</strong
+                      <span>{t('price')}</span><strong
+                        >{product.price > 0 ? money(product.price) : t('askPrice')}</strong
                       >
                     </div>
                     <div>
-                      <span>Quantity</span><strong>{product.stock}</strong>
+                      <span>{t('quantity')}</span><strong>{product.stock}</strong>
                     </div>
                   </div>
                   {@render cashOnDelivery()}
-                  <a class="enquire" href={`tel:${phone}`}><Icon name="phone" size={17} />Call us</a
+                  <a class="enquire" href={`tel:${phone}`}
+                    ><Icon name="phone" size={17} />{t('callUs')}</a
                   >
                 </div>
               </article>
@@ -418,8 +455,8 @@
     <div class="container">
       {#if videos.length}
         <div class="section-heading centered light">
-          <p class="eyebrow-text">See it working</p>
-          <h2>Know what arrives</h2>
+          <p class="eyebrow-text">{t('seeItWorking')}</p>
+          <h2>{t('knowWhatArrives')}</h2>
         </div>
         <div class="video-grid" class:single={videos.length === 1}>
           {#each videos as video, index}
@@ -433,7 +470,7 @@
                 />
               </video>
               <div>
-                <p><span>Film 0{index + 1}</span><strong>{video.title}</strong></p>
+                <p><span>{t('film')} 0{index + 1}</span><strong>{video.title}</strong></p>
                 <ShareButton
                   src={video.src}
                   link="/#videos"
@@ -447,7 +484,7 @@
         </div>
       {/if}
       <div class="follow">
-        <p>Watch more of our products working</p>
+        <p>{t('watchMore')}</p>
         <div>
           <a class="button youtube" href={YOUTUBE_URL} target="_blank" rel="noreferrer"
             ><Icon name="youtube" size={22} />YouTube</a
@@ -463,11 +500,11 @@
   <section class="section callback-section" id="callback">
     <div class="container callback">
       <div class="section-heading centered">
-        <h2>Contact us</h2>
+        <h2>{t('contactUs')}</h2>
       </div>
       <div class="contact-brand">
         <strong>Raghav Kitchen Equipments</strong>
-        <small>A unit of Naazare Enterprises</small>
+        <small>{t('unit')}</small>
         <p class="contact-address">
           <Icon name="pin" size={16} />
           {#if data.settings.address}
@@ -481,11 +518,14 @@
         {#if requestNumber}
           <div class="success" role="status">
             <span class="success-icon">✓</span>
-            <p class="eyebrow-text">Request received</p>
-            <h3>Thank you, {form.customer_name}!</h3>
+            <p class="eyebrow-text">{t('requestReceived')}</p>
+            <h3>{t('thankYou', { name: form.customer_name })}</h3>
             <p>
-              Your request number is <strong>#{requestNumber}</strong>. We will call you on
-              <strong>{form.mobile_primary}</strong> shortly.
+              <!-- The number and mobile sit in bold wherever each language places them. -->
+              {#each t('requestDone').split(/(\{number\}|\{mobile\})/) as part}{#if part === '{number}'}<strong
+                    >#{requestNumber}</strong
+                  >{:else if part === '{mobile}'}<strong>{form.mobile_primary}</strong
+                  >{:else}{part}{/if}{/each}
             </p>
             <button
               class="button"
@@ -494,14 +534,14 @@
                 requestNumber = '';
                 form.product_id = '';
                 form.message = '';
-              }}>Send another request</button
+              }}>{t('sendAnother')}</button
             >
           </div>
         {:else}
           <form onsubmit={submitRequest}>
             <div class="form-grid">
               <label class="full"
-                ><span>Your name *</span><input
+                ><span>{t('yourName')} *</span><input
                   id="customer-name"
                   bind:value={form.customer_name}
                   required
@@ -509,7 +549,7 @@
                 /></label
               >
               <label
-                ><span>Mobile number *</span><input
+                ><span>{t('mobile')} *</span><input
                   bind:value={form.mobile_primary}
                   required
                   type="tel"
@@ -517,11 +557,11 @@
                   pattern={'[0-9]{10}'}
                   maxlength="10"
                   autocomplete="tel-national"
-                  title="10-digit mobile number"
+                  title={t('mobileTitle')}
                 /></label
               >
               <label
-                ><span>Alternate mobile</span><input
+                ><span>{t('altMobile')}</span><input
                   bind:value={form.mobile_secondary}
                   type="tel"
                   inputmode="numeric"
@@ -529,34 +569,34 @@
                 /></label
               >
               <label class="full"
-                ><span>Street / area / locality</span><input
+                ><span>{t('street')}</span><input
                   bind:value={form.road}
                   autocomplete="street-address"
-                  placeholder="Door no., street, area"
+                  placeholder={t('streetHint')}
                 /></label
               >
-              <label><span>District</span><input bind:value={form.district} /></label>
+              <label><span>{t('district')}</span><input bind:value={form.district} /></label>
               <label
-                ><span>Town / city *</span><input
+                ><span>{t('city')} *</span><input
                   bind:value={form.city}
                   required
                   autocomplete="address-level2"
                 /></label
               >
               <label class="full"
-                ><span>Landmark</span><input
+                ><span>{t('landmark')}</span><input
                   bind:value={form.landmark}
-                  placeholder="Near temple, bus stop, school…"
+                  placeholder={t('landmarkHint')}
                 /></label
               >
               <label
-                ><span>State</span><input
+                ><span>{t('state')}</span><input
                   bind:value={form.state}
                   autocomplete="address-level1"
                 /></label
               >
               <label
-                ><span>PIN code</span><input
+                ><span>{t('pincode')}</span><input
                   bind:value={form.pincode}
                   inputmode="numeric"
                   pattern={'[0-9]{6}'}
@@ -564,10 +604,10 @@
                   autocomplete="postal-code"
                 /></label
               >
-              <label><span>Shop / business name</span><input bind:value={form.shop_name} /></label>
+              <label><span>{t('shopName')}</span><input bind:value={form.shop_name} /></label>
               <label class="full"
-                ><span>Interested in</span><select bind:value={form.product_id}>
-                  <option value="">Not sure yet / something else</option>
+                ><span>{t('interestedIn')}</span><select bind:value={form.product_id}>
+                  <option value="">{t('notSure')}</option>
                   {#each data.frames as frame}
                     <optgroup label={frame.title}>
                       {#each frame.products as product}
@@ -578,19 +618,17 @@
                 </select></label
               >
               <label class="full"
-                ><span>Message</span><textarea
+                ><span>{t('message')}</span><textarea
                   bind:value={form.message}
                   rows="3"
-                  placeholder="Quantity, model, or anything we should know"></textarea></label
+                  placeholder={t('messageHint')}></textarea></label
               >
             </div>
             {#if errorMessage}<p class="form-error" role="alert">{errorMessage}</p>{/if}
             <button class="button primary submit" type="submit" disabled={submitting}>
-              {submitting ? 'Sending…' : 'Request a callback'}
+              {submitting ? t('sending') : t('requestCallback')}
             </button>
-            <p class="privacy-note">
-              We only use your details to call you back about this request.
-            </p>
+            <p class="privacy-note">{t('callbackPrivacy')}</p>
           </form>
         {/if}
       </div>
@@ -603,8 +641,8 @@
 <footer class="site-footer">
   <div class="container footer-inner">
     <div class="footer-brand">
-      <Logo href="#home" tone="light" />
-      <p>Dealers in commercial kitchen equipment since 2004.</p>
+      <Logo href="#home" tone="light" tagline={t('unit')} />
+      <p>{t('tagline')}.</p>
       <div class="footer-social">
         <a href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp"
           ><Icon name="whatsapp" size={17} /></a
@@ -622,23 +660,23 @@
       </div>
     </div>
     <div>
-      <h3>Products</h3>
+      <h3>{t('products')}</h3>
       <ul>
         {#each productLines as line}<li>{line}</li>{/each}
       </ul>
     </div>
     <div>
-      <h3>Quick links</h3>
+      <h3>{t('quickLinks')}</h3>
       <ul>
-        <li><a href="#about">About us</a></li>
-        <li><a href="#products">Products</a></li>
-        <li><a href="#videos">Videos</a></li>
-        <li><a href="#callback">Contact us</a></li>
-        <li><a href="#reviews">Reviews</a></li>
+        <li><a href="#about">{t('aboutUs')}</a></li>
+        <li><a href="#products">{t('products')}</a></li>
+        <li><a href="#videos">{t('videos')}</a></li>
+        <li><a href="#callback">{t('contactUs')}</a></li>
+        <li><a href="#reviews">{t('reviews')}</a></li>
       </ul>
     </div>
     <div>
-      <h3>Contact</h3>
+      <h3>{t('contact')}</h3>
       <ul class="footer-contact">
         <li>
           <Icon name="pin" size={15} />{data.settings.address || 'Mysore 570011'}
@@ -658,11 +696,11 @@
     </div>
   </div>
   <div class="container footer-terms">
-    <span>All disputes are subject to Mysore jurisdiction only</span>
+    <span>{t('disputes')}</span>
   </div>
   <div class="container footer-bottom">
-    <span>© {new Date().getFullYear()} {data.settings.business_name}. All rights reserved.</span>
-    <span>Since 2004 · Delivery across India</span>
+    <span>© {new Date().getFullYear()} {data.settings.business_name}. {t('rights')}</span>
+    <span>{t('footerBottom')}</span>
   </div>
 </footer>
 
@@ -684,7 +722,8 @@
           <track kind="captions" src="/media/demo-captions.vtt" srclang="en" label="English" />
         </video>
       {/if}
-      <button class="viewer-close" type="button" onclick={closeProduct} aria-label="Close">×</button
+      <button class="viewer-close" type="button" onclick={closeProduct} aria-label={t('close')}
+        >×</button
       >
       {#if selectedMedia}
         <div class="viewer-share">
@@ -701,19 +740,19 @@
           class="viewer-nav prev"
           type="button"
           onclick={() => showMedia(-1)}
-          aria-label="Previous photo">‹</button
+          aria-label={t('previousPhoto')}>‹</button
         >
         <button
           class="viewer-nav next"
           type="button"
           onclick={() => showMedia(1)}
-          aria-label="Next photo">›</button
+          aria-label={t('nextPhoto')}>›</button
         >
         <span class="viewer-count">{activeMediaIndex + 1} / {media.length}</span>
       {/if}
     </div>
     <div class="viewer-side">
-      <div class="viewer-thumbnails" aria-label="Choose photo or video">
+      <div class="viewer-thumbnails" aria-label={t('choosePhoto')}>
         {#each media as item, mediaIndex}
           <button
             type="button"
@@ -735,12 +774,12 @@
         {#if viewedProduct.description}<p>{viewedProduct.description}</p>{/if}
         <div class="product-meta">
           <div>
-            <span>Price</span><strong
-              >{viewedProduct.price > 0 ? money(viewedProduct.price) : 'Ask price'}</strong
+            <span>{t('price')}</span><strong
+              >{viewedProduct.price > 0 ? money(viewedProduct.price) : t('askPrice')}</strong
             >
           </div>
           <div>
-            <span>Quantity</span><strong>{viewedProduct.stock}</strong>
+            <span>{t('quantity')}</span><strong>{viewedProduct.stock}</strong>
           </div>
         </div>
         {@render cashOnDelivery()}
@@ -755,11 +794,11 @@
   href={whatsappHref}
   target="_blank"
   rel="noreferrer"
-  aria-label="Chat on WhatsApp"><Icon name="whatsapp" size={30} /></a
+  aria-label={t('chatWhatsapp')}><Icon name="whatsapp" size={30} /></a
 >
 
 <nav class="mobile-dock" aria-label="Quick actions">
-  <a href={`tel:${phone}`}><Icon name="phone" size={22} />Call us</a>
+  <a href={`tel:${phone}`}><Icon name="phone" size={22} />{t('callUs')}</a>
   <a href={whatsappHref} target="_blank" rel="noreferrer"
     ><Icon name="whatsapp" size={23} />WhatsApp</a
   >

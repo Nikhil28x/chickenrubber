@@ -18,7 +18,7 @@
     video?: boolean;
   } = $props();
 
-  const MAX_BYTES = 4 * 1024 * 1024;
+  const MAX_BYTES = 15 * 1024 * 1024;
 
   // Starts from the saved file, then follows uploads made in this tile.
   let current = $state(untrack(() => src));
@@ -62,7 +62,7 @@
           result.error ||
             result.message ||
             (response.status === 413
-              ? 'This file is too large. Please use one under 4 MB.'
+              ? 'This file is too large. Please use one under 15 MB.'
               : 'Upload failed. Please try again.')
         );
       }
@@ -83,7 +83,7 @@
     if (file.size > MAX_BYTES) {
       status = 'error';
       message = video
-        ? 'This video is too large. Please use a clip under 4 MB.'
+        ? 'This video is too large. Please use a clip under 15 MB.'
         : 'This photo is too large. Please choose a smaller photo.';
       return;
     }

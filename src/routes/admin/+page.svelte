@@ -6,9 +6,56 @@
   import type { ActionData, PageData } from './$types';
   let { data, form }: { data: PageData; form: ActionData } = $props();
   // Forms post without JS enhancement, so reopen the tab that was just saved.
-  let activeTab = $state<'orders' | 'products' | 'reviews' | 'settings'>(
+  let activeTab = $state<'orders' | 'products' | 'reviews' | 'settings' | 'storage'>(
     untrack(() => (form && 'tab' in form && form.tab ? form.tab : 'orders'))
   );
+
+  // Neon's free plan allows 0.5 GB per project. Change this if the plan changes.
+  const STORAGE_LIMIT_BYTES = 512 * 1024 * 1024;
+  const VIDEO_BYTES = 20 * 1024 * 1024; // A 15 MB video takes about 20 MB once stored.
+  const PHOTO_BYTES = 1.3 * 1024 * 1024; // A typical 1 MB phone photo, once stored.
+
+  const storageUsed = $derived(data.storage.total_bytes);
+  const storagePercent = $derived(Math.min(100, (storageUsed / STORAGE_LIMIT_BYTES) * 100));
+  const storageLeft = $derived(Math.max(0, STORAGE_LIMIT_BYTES - storageUsed));
+  const storageLevel = $derived(
+    storagePercent >= 90 ? 'full' : storagePercent >= 70 ? 'high' : 'ok'
+  );
+  const storageParts = $derived.by(() => {
+    const { photo_bytes, video_bytes, home_bytes, photo_count, video_count } = data.storage;
+    return [
+      {
+        label: 'Product photos',
+        detail: `${photo_count} files`,
+        bytes: photo_bytes,
+        tone: 'photos'
+      },
+      {
+        label: 'Product videos',
+        detail: `${video_count} files`,
+        bytes: video_bytes,
+        tone: 'videos'
+      },
+      {
+        label: 'Home page photo and videos',
+        detail: 'Hero photo, Video 1 and 2',
+        bytes: home_bytes,
+        tone: 'home'
+      },
+      {
+        label: 'Everything else',
+        detail: 'Requests, reviews, details and database overhead',
+        bytes: Math.max(0, storageUsed - photo_bytes - video_bytes - home_bytes),
+        tone: 'other'
+      }
+    ];
+  });
+
+  function size(bytes: number) {
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+    return `${Math.round(bytes / 1024)} KB`;
+  }
 
   const waitingReviews = $derived(data.reviews.filter((review) => !review.is_approved).length);
 
@@ -104,6 +151,10 @@
     <button class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}
       >Business details</button
     >
+    <button class:active={activeTab === 'storage'} onclick={() => (activeTab = 'storage')}
+      >Storage <span class={`storage-pill ${storageLevel}`}>{Math.round(storagePercent)}%</span
+      ></button
+    >
   </nav>
 
   {#if activeTab === 'orders'}
@@ -177,6 +228,20 @@
                   href={`https://wa.me/91${order.mobile_primary}?text=${encodeURIComponent(`Hello ${order.customer_name}, this is Raghav Kitchen Equipments regarding your callback request #${order.order_number}. `)}`}
                   >WhatsApp customer</a
                 >
+                <button
+                  class="button order-delete"
+                  type="submit"
+                  formaction="?/deleteOrder"
+                  formnovalidate
+                  onclick={(event) => {
+                    if (
+                      !confirm(
+                        `Delete request #${order.order_number} from ${order.customer_name}? This cannot be undone.`
+                      )
+                    )
+                      event.preventDefault();
+                  }}>Delete</button
+                >
               </form>
             </article>
           {/each}
@@ -216,6 +281,7 @@
             </summary>
 
             <form method="POST" action="?/updateFrame" class="frame-settings">
+              <p class="frame-settings-title">Frame settings</p>
               <input type="hidden" name="id" value={frame.id} />
               <label class="admin-field"
                 ><span>Frame title</span><input name="title" value={frame.title} required /></label
@@ -243,8 +309,13 @@
             </form>
 
             <div class="admin-product-grid">
-              {#each frame.products as product}
-                <div class="edit-product">
+              {#each frame.products as product, productIndex}
+                <div class="edit-product" class:hidden-product={!product.is_active}>
+                  <div class="product-head">
+                    <span class="product-number">{productIndex + 1}</span>
+                    <strong>Product {productIndex + 1}</strong>
+                    <b>{product.is_active ? 'Shown' : 'Hidden'}</b>
+                  </div>
                   <ProductGallery productId={product.id} media={product.media} />
                   <p class="upload-help">
                     Tap a box to add or change a photo. It saves straight away.
@@ -291,7 +362,9 @@
                         >Show this product</span
                       ></label
                     >
-                    <button class="button primary" type="submit">Save product</button>
+                    <button class="button primary product-save" type="submit"
+                      >Save product {productIndex + 1}</button
+                    >
                   </form>
                 </div>
               {/each}
@@ -424,7 +497,7 @@
         {/each}
       </div>
     </section>
-  {:else}
+  {:else if activeTab === 'settings'}
     <section class="admin-panel">
       <div class="panel-heading">
         <div>
@@ -512,6 +585,64 @@
           />
         </div>
       </div>
+    </section>
+  {:else if activeTab === 'storage'}
+    <section class="admin-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow-text">Neon database</p>
+          <h2>Storage used</h2>
+        </div>
+        <p>
+          All photos, videos, requests and reviews are kept in the database. The free plan allows
+          {size(STORAGE_LIMIT_BYTES)}.
+        </p>
+      </div>
+
+      <div class={`storage-meter ${storageLevel}`}>
+        <div class="storage-figures">
+          <strong>{size(storageUsed)}</strong>
+          <span>of {size(STORAGE_LIMIT_BYTES)} used · {storagePercent.toFixed(1)}%</span>
+        </div>
+        <div
+          class="storage-bar"
+          role="meter"
+          aria-label="Database storage used"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={Math.round(storagePercent)}
+        >
+          {#each storageParts as part}
+            <i
+              class={part.tone}
+              style={`width: ${Math.min(100, (part.bytes / STORAGE_LIMIT_BYTES) * 100)}%`}
+            ></i>
+          {/each}
+        </div>
+        <p class="storage-left">
+          {#if storageLevel === 'full'}
+            Almost full: only {size(storageLeft)} left. Remove old videos or photos, or upgrade the Neon
+            plan, before adding more.
+          {:else}
+            {size(storageLeft)} free, about {Math.floor(storageLeft / VIDEO_BYTES)} more 15 MB videos
+            or {Math.floor(storageLeft / PHOTO_BYTES)} more phone photos.
+          {/if}
+        </p>
+      </div>
+
+      <ul class="storage-parts">
+        {#each storageParts as part}
+          <li>
+            <i class={part.tone} aria-hidden="true"></i>
+            <span><strong>{part.label}</strong><small>{part.detail}</small></span>
+            <b>{size(part.bytes)}</b>
+          </li>
+        {/each}
+      </ul>
+      <p class="storage-note">
+        Figures are worked out from the database when this page loads. Neon's own dashboard may show
+        a slightly different number because it also counts change history.
+      </p>
     </section>
   {/if}
 </main>
@@ -647,6 +778,115 @@
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.2);
     font-size: 0.65rem;
+  }
+  .storage-pill.ok {
+    background: var(--sky);
+  }
+  .storage-pill.high {
+    background: #fdecc8;
+    color: #8a5a00;
+  }
+  .storage-pill.full {
+    background: #fbd5d5;
+    color: #a12020;
+  }
+  .storage-meter {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--white);
+  }
+  .storage-figures {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+  }
+  .storage-figures strong {
+    color: var(--navy);
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    letter-spacing: -0.03em;
+  }
+  .storage-figures span {
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .storage-bar {
+    display: flex;
+    height: 18px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--soft);
+  }
+  .storage-bar i {
+    display: block;
+    height: 100%;
+  }
+  .storage-left {
+    margin: 0;
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .storage-meter.high .storage-left {
+    color: #8a5a00;
+  }
+  .storage-meter.full .storage-left {
+    color: #a12020;
+  }
+  .photos {
+    background: var(--blue);
+  }
+  .videos {
+    background: #e08a1e;
+  }
+  .home {
+    background: #7a5bc7;
+  }
+  .other {
+    background: var(--line-strong);
+  }
+  .storage-parts {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .storage-parts li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--white);
+  }
+  .storage-parts li > i {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border-radius: 4px;
+  }
+  .storage-parts span {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+  .storage-parts small {
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .storage-parts b {
+    color: var(--navy);
+    white-space: nowrap;
+  }
+  .storage-note {
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
   }
   .admin-tabs .tab-new {
     background: var(--cod);
@@ -809,24 +1049,73 @@
   }
   .admin-product-grid {
     display: grid;
-    gap: 14px;
+    gap: 20px;
   }
   .product-details {
-    display: grid;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     gap: 13px;
+  }
+  /* Keeps every card's Save button at the bottom of its own card. */
+  .product-save {
+    width: 100%;
+    margin-top: auto;
   }
   .settings-media {
     display: grid;
     gap: 12px;
     margin-top: 24px;
   }
+  /* Each product is its own white card with a coloured top band, so it is clear
+     where one product ends and the next begins. */
   .edit-product {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 13px;
-    padding: 14px;
-    border: 1px solid var(--line);
+    padding: 0 14px 14px;
+    overflow: hidden;
+    border: 2px solid var(--line-strong);
     border-radius: 16px;
-    background: var(--surface);
+    background: var(--white);
+    box-shadow: 0 6px 18px rgb(15 23 42 / 0.08);
+  }
+  .product-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 -14px;
+    padding: 10px 14px;
+    background: var(--blue);
+    color: var(--white);
+  }
+  .product-head strong {
+    flex: 1;
+    font-size: 0.95rem;
+  }
+  .product-number {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--white);
+    color: var(--blue);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+  .product-head b {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.2);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+  }
+  .hidden-product .product-head {
+    background: var(--muted);
+  }
+  .hidden-product .product-number {
+    color: var(--muted);
   }
   .product-media-admin {
     display: grid;
@@ -949,6 +1238,14 @@
     border-radius: 14px;
     background: var(--paper);
   }
+  .frame-settings-title {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--navy);
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
   .frame-admin .admin-product-grid {
     padding: 0 16px 16px;
   }
@@ -987,7 +1284,7 @@
       align-items: end;
     }
     .status-form {
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr auto auto auto;
     }
     .admin-product-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1080,6 +1377,15 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 10px;
+  }
+  .order-delete {
+    border: 1.5px solid var(--danger);
+    background: var(--white);
+    color: var(--danger);
+  }
+  .order-delete:hover {
+    background: var(--danger);
+    color: var(--white);
   }
   .review-delete {
     margin-left: auto;

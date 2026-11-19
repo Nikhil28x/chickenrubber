@@ -6,7 +6,7 @@
   // change saves straight away. The first photo is the main photo.
   let { productId, media }: { productId: number; media: ProductMedia[] } = $props();
 
-  const MAX_BYTES = 4 * 1024 * 1024;
+  const MAX_BYTES = 15 * 1024 * 1024;
 
   let items = $state(untrack(() => [...media]));
   let busy = $state(false);
@@ -52,7 +52,7 @@
         result.error ||
           result.message ||
           (response.status === 413
-            ? 'This file is too large. Please use one under 4 MB.'
+            ? 'This file is too large. Please use one under 15 MB.'
             : 'Upload failed. Please try again.')
       );
     }
@@ -76,7 +76,7 @@
         if (file.size > MAX_BYTES) {
           throw new Error(
             isVideo
-              ? 'This video is too large. Please use a clip under 4 MB.'
+              ? 'This video is too large. Please use a clip under 15 MB.'
               : 'This photo is too large. Please choose a smaller photo.'
           );
         }

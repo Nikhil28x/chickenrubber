@@ -12,8 +12,9 @@ export const MEDIA_TABLES: Record<MediaKind, string> = {
   settings: 'site_settings'
 };
 
-// Files are stored in the database and held in memory while served, so keep each small.
-export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+// Files are stored in the database and held in memory while served, so keep each
+// under 15 MB (Workers have 128 MB of memory per request).
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export function isMediaField(kind: string, field: string): kind is MediaKind {
   return (

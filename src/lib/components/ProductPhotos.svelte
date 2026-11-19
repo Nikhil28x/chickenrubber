@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import ShareButton from './ShareButton.svelte';
+  import { useI18n } from '../i18n';
+
+  const t = useI18n();
 
   // The photos and videos on a product card: swipe or use the arrows to see
   // them all, and tap one to open it full screen.
@@ -71,9 +74,9 @@
       class="photo-arrow prev"
       type="button"
       onclick={() => go(-1)}
-      aria-label="Previous photo">‹</button
+      aria-label={t('previousPhoto')}>‹</button
     >
-    <button class="photo-arrow next" type="button" onclick={() => go(1)} aria-label="Next photo"
+    <button class="photo-arrow next" type="button" onclick={() => go(1)} aria-label={t('nextPhoto')}
       >›</button
     >
     <span class="view-media" aria-hidden="true">{current + 1} / {media.length}</span>

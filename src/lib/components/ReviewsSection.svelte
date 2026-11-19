@@ -1,5 +1,8 @@
 <script lang="ts">
   import type { Review } from '../types';
+  import { useI18n } from '../i18n';
+
+  const t = useI18n();
 
   // Approved customer reviews, plus the form for sending a new one.
   let { reviews, sample = false }: { reviews: Review[]; sample?: boolean } = $props();
@@ -35,7 +38,7 @@
     event.preventDefault();
     errorMessage = '';
     if (!form.rating) {
-      errorMessage = 'Please choose a star rating';
+      errorMessage = t('chooseRating');
       return;
     }
     sending = true;
@@ -49,10 +52,7 @@
       if (!response.ok) throw new Error(result.error);
       sent = true;
     } catch (error) {
-      errorMessage =
-        error instanceof Error && error.message
-          ? error.message
-          : 'Could not send your review. Please try again.';
+      errorMessage = error instanceof Error && error.message ? error.message : t('reviewFailed');
     } finally {
       sending = false;
     }
@@ -62,7 +62,7 @@
 <section class="section reviews-section" id="reviews">
   <div class="container">
     <div class="section-heading centered">
-      <h2>{reviews.length ? 'What our customers say' : 'Bought from us before?'}</h2>
+      <h2>{reviews.length ? t('whatCustomersSay') : t('boughtBefore')}</h2>
       {#if sample}<p class="sample-note"></p>{/if}
     </div>
   </div>
@@ -77,7 +77,10 @@
             aria-hidden={index >= reviews.length}
           >
             <div class="review-rating">
-              <span class="review-stars" role="img" aria-label={`${review.rating} out of 5 stars`}
+              <span
+                class="review-stars"
+                role="img"
+                aria-label={t('starsAria', { n: review.rating })}
                 >★★★★★<span class="stars-on" style={`width: ${(review.rating / 5) * 100}%`}
                   >★★★★★</span
                 ></span
@@ -98,17 +101,17 @@
   <div class="container review-compose">
     {#if sent}
       <p class="review-thanks" role="status">
-        Thank you, {form.customer_name}! Your review will appear here after we check it.
+        {t('reviewThanks', { name: form.customer_name })}
       </p>
     {:else if !formOpen}
       <button class="button primary" type="button" onclick={() => (formOpen = true)}
-        >Leave a review</button
+        >{t('leaveReview')}</button
       >
     {:else}
       <form class="callback-card review-form" onsubmit={submit}>
         <div class="form-grid">
           <label class="full"
-            ><span>Your name *</span><input
+            ><span>{t('yourName')} *</span><input
               bind:value={form.customer_name}
               required
               maxlength="80"
@@ -116,7 +119,7 @@
             /></label
           >
           <label
-            ><span>Mobile number *</span><input
+            ><span>{t('mobile')} *</span><input
               bind:value={form.mobile}
               required
               type="tel"
@@ -124,33 +127,33 @@
               pattern={'[0-9]{10}'}
               maxlength="10"
               autocomplete="tel-national"
-              title="10-digit mobile number"
+              title={t('mobileTitle')}
             /></label
           >
           <label
-            ><span>Town / city</span><input
+            ><span>{t('city')}</span><input
               bind:value={form.location}
               maxlength="80"
               autocomplete="address-level2"
             /></label
           >
           <fieldset class="full star-picker">
-            <legend>Your rating *</legend>
+            <legend>{t('yourRating')} *</legend>
             {#each [1, 2, 3, 4, 5] as value}
               <label class:on={form.rating >= value}>
                 <input type="radio" name="review-rating" {value} bind:group={form.rating} />
                 <span aria-hidden="true">★</span>
-                <b>{value} star{value === 1 ? '' : 's'}</b>
+                <b>{value === 1 ? t('star1') : t('starsN', { n: value })}</b>
               </label>
             {/each}
           </fieldset>
           <label class="full"
-            ><span>Your review *</span><textarea
+            ><span>{t('yourReview')} *</span><textarea
               bind:value={form.comment}
               required
               rows="3"
               maxlength="300"
-              placeholder="What did you buy, and how has it worked for you?"></textarea></label
+              placeholder={t('reviewHint')}></textarea></label
           >
           <label class="review-trap" aria-hidden="true"
             >Website<input bind:value={form.website} tabindex="-1" autocomplete="off" /></label
@@ -158,12 +161,9 @@
         </div>
         {#if errorMessage}<p class="form-error" role="alert">{errorMessage}</p>{/if}
         <button class="button primary submit" type="submit" disabled={sending}>
-          {sending ? 'Sending…' : 'Send review'}
+          {sending ? t('sending') : t('sendReview')}
         </button>
-        <p class="privacy-note">
-          We may show your name, town, rating and review on this website. Your mobile number is
-          never shown; we only use it to check the review.
-        </p>
+        <p class="privacy-note">{t('reviewPrivacy')}</p>
       </form>
     {/if}
   </div>

@@ -62,3 +62,13 @@ export type OrderItem = {
   quantity: number;
   price: number;
 };
+
+// How much of the Neon database is in use (admin Storage tab).
+export type StorageUsage = {
+  total_bytes: number;
+  photo_count: number;
+  photo_bytes: number;
+  video_count: number;
+  video_bytes: number;
+  home_bytes: number;
+};

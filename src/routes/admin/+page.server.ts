@@ -8,7 +8,7 @@ import {
   type ProductRow
 } from '../../lib/server/db';
 import { insertPlaceholderProducts } from '../../lib/server/schema';
-import type { AdminReview, Frame } from '../../lib/types';
+import type { AdminReview, Frame, StorageUsage } from '../../lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 function field(form: FormData, name: string) {
@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
   if (!locals.admin) redirect(303, '/admin/login');
   await initDb();
 
-  const [settings, frames, products, orders, counts, reviews] = await Promise.all([
+  const [settings, frames, products, orders, counts, reviews, storage] = await Promise.all([
     dbQuery(`SELECT ${SETTINGS_COLUMNS} FROM site_settings WHERE id = 1`),
     dbQuery<Frame>(
       'SELECT id, title, subtitle, is_active, sort_order FROM frames ORDER BY sort_order, id'
@@ -47,6 +47,19 @@ export const load: PageServerLoad = async ({ locals }) => {
     dbQuery<AdminReview>(
       `SELECT id, customer_name, location, mobile, rating, comment, source, is_approved, created_at
        FROM reviews ORDER BY is_approved, created_at DESC, id DESC LIMIT 200`
+    ),
+    // Space used in Neon. pg_column_size is the size as stored on disk.
+    dbQuery<StorageUsage>(
+      `SELECT pg_database_size(current_database())::float8 AS total_bytes,
+       (SELECT COUNT(*)::int FROM product_media WHERE kind = 'image') AS photo_count,
+       (SELECT COALESCE(SUM(pg_column_size(url)), 0)::float8 FROM product_media
+         WHERE kind = 'image') AS photo_bytes,
+       (SELECT COUNT(*)::int FROM product_media WHERE kind = 'video') AS video_count,
+       (SELECT COALESCE(SUM(pg_column_size(url)), 0)::float8 FROM product_media
+         WHERE kind = 'video') AS video_bytes,
+       (SELECT COALESCE(pg_column_size(hero_image_url), 0) + COALESCE(pg_column_size(video_1_url), 0)
+         + COALESCE(pg_column_size(video_2_url), 0) FROM site_settings WHERE id = 1)::float8
+         AS home_bytes`
     )
   ]);
 
@@ -59,7 +72,8 @@ export const load: PageServerLoad = async ({ locals }) => {
     })),
     orders: orders.rows,
     reviews: reviews.rows,
-    stats: counts.rows[0]
+    stats: counts.rows[0],
+    storage: storage.rows[0]
   };
 };
 
@@ -195,6 +209,13 @@ export const actions: Actions = {
     }
     await dbQuery('UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2', [status, id]);
     return { success: 'Request status updated.' };
+  },
+
+  deleteOrder: async ({ request, locals }) => {
+    if (!locals.admin) redirect(303, '/admin/login');
+    const form = await request.formData();
+    await dbQuery('DELETE FROM orders WHERE id=$1', [Number(field(form, 'id'))]);
+    return { success: 'Request deleted.' };
   },
 
   logout: async ({ cookies }) => {

@@ -28,7 +28,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       return json(
         {
           error: isVideo
-            ? 'This video is too large. Please use a clip under 4 MB.'
+            ? 'This video is too large. Please use a clip under 15 MB.'
             : 'This photo is too large. Please choose a smaller photo.'
         },
         { status: 413 }

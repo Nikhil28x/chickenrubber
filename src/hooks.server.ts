@@ -2,6 +2,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit/hooks';
 import { verifyAdminToken } from './lib/server/auth';
 import { closeDb } from './lib/server/db';
+import { isLang, LANG_COOKIE } from './lib/i18n';
 import { waitUntil } from 'cloudflare:workers';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -14,7 +15,12 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (cached) return cached;
 
   try {
-    const response = await resolve(event);
+    // Storefront pages open in the visitor's chosen language; admin stays English.
+    const saved = event.cookies.get(LANG_COOKIE);
+    const lang = isLang(saved) && !event.url.pathname.startsWith('/admin') ? saved : 'en';
+    const response = await resolve(event, {
+      transformPageChunk: ({ html }) => html.replace('%lang%', lang)
+    });
     if (cache && response.status === 200) {
       waitUntil(cache.put(event.request, response.clone()));
     }

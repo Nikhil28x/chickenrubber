@@ -19,7 +19,14 @@
     "directory": ".svelte-kit/cloudflare"
   },
   // Keeps warm connections to the Neon database so pages load quickly.
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "216eb781d6464b65ba149234872bd7aa" }],
+  // The local dev server talks to Neon directly; wrangler still needs a placeholder here.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "216eb781d6464b65ba149234872bd7aa",
+      "localConnectionString": "postgres://unused@localhost:5432/unused"
+    }
+  ],
   "observability": {
     "enabled": true
   }
