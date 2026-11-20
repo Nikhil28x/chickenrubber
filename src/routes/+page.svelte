@@ -5,7 +5,8 @@
   import ReviewsSection from '../lib/components/ReviewsSection.svelte';
   import ShareButton from '../lib/components/ShareButton.svelte';
   import LanguagePicker from '../lib/components/LanguagePicker.svelte';
-  import { LANG_COOKIE, setI18n, translator, type Lang } from '../lib/i18n';
+  import { LANG_COOKIE, setI18n, translator, type Lang, type MessageKey } from '../lib/i18n';
+  import { SITE_URL, SEO_DESCRIPTION, SEO_TITLE_SUFFIX, structuredData } from '../lib/seo';
   import { INSTAGRAM_URL, YOUTUBE_URL } from '../lib/social';
   import type { Product } from '../lib/types';
   import type { PageData } from './$types';
@@ -37,6 +38,21 @@
     t('line6')
   ]);
   const yearsInTrade = new Date().getFullYear() - 2004;
+
+  // Full product range and FAQ: shown on the page and described to search engines.
+  const rangeKeys = [1, 2, 3, 4, 5, 6, 7] as const;
+  const range = $derived(
+    rangeKeys.map((n) => ({
+      title: t(`cat${n}Title` as MessageKey),
+      body: t(`cat${n}Body` as MessageKey)
+    }))
+  );
+  const faqs = $derived(
+    [1, 2, 3, 4, 5, 6].map((n) => ({
+      question: t(`faq${n}Q` as MessageKey),
+      answer: t(`faq${n}A` as MessageKey, { phone: formatPhone(data.settings.phone) })
+    }))
+  );
 
   let submitting = $state(false);
   let errorMessage = $state('');
@@ -242,11 +258,22 @@
 {/snippet}
 
 <svelte:head>
-  <title>{data.settings.business_name} | Commercial Kitchen Equipment Since 2004</title>
+  <title>{data.settings.business_name} | {SEO_TITLE_SUFFIX}</title>
+  <meta name="description" content={SEO_DESCRIPTION} />
+  <link rel="canonical" href={`${SITE_URL}/`} />
   <meta
-    name="description"
-    content="Raghav Kitchen Equipments (a unit of Naazare Enterprises) — dealers in commercial kitchen equipment since 2004. Chicken feather cleaning machines, chicken cutting machines, rubbers and bushes, commercial mixers, grinders and dough kneading machines."
+    name="robots"
+    content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
   />
+  <meta name="geo.region" content="IN-KA" />
+  <meta name="geo.placename" content="Mysuru (Mysore), Karnataka" />
+  <meta property="og:locale" content="en_IN" />
+  {@html `<script type="application/ld+json">${structuredData({
+    settings: data.settings,
+    products: allProducts,
+    faqs,
+    range
+  })}</script>`}
   <!-- Link previews on WhatsApp and Facebook. -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content={data.settings.business_name} />
@@ -451,6 +478,24 @@
     </div>
   </section>
 
+  <section class="section range-section" id="range">
+    <div class="container">
+      <div class="section-heading centered">
+        <p class="eyebrow-text">{t('rangeEyebrow')}</p>
+        <h2>{t('rangeTitle')}</h2>
+        <p class="range-intro">{t('rangeIntro')}</p>
+      </div>
+      <ul class="range-grid">
+        {#each range as item}
+          <li>
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </section>
+
   <section class="videos section" id="videos">
     <div class="container">
       {#if videos.length}
@@ -636,6 +681,22 @@
   </section>
 
   <ReviewsSection reviews={data.reviews} sample={data.sampleReviews} />
+
+  <section class="section faq-section" id="faq">
+    <div class="container faq-inner">
+      <div class="section-heading centered">
+        <h2>{t('faqTitle')}</h2>
+      </div>
+      <div class="faq-list">
+        {#each faqs as faq, index}
+          <details open={index === 0}>
+            <summary><h3>{faq.question}</h3></summary>
+            <p>{faq.answer}</p>
+          </details>
+        {/each}
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="site-footer">
@@ -673,6 +734,7 @@
         <li><a href="#videos">{t('videos')}</a></li>
         <li><a href="#callback">{t('contactUs')}</a></li>
         <li><a href="#reviews">{t('reviews')}</a></li>
+        <li><a href="#faq">{t('faqTitle')}</a></li>
       </ul>
     </div>
     <div>

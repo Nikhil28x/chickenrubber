@@ -21,6 +21,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event, {
       transformPageChunk: ({ html }) => html.replace('%lang%', lang)
     });
+    // Keep the admin and API out of search results.
+    const { pathname } = event.url;
+    if (pathname.startsWith('/admin') || pathname.startsWith('/api/')) {
+      response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    }
     if (cache && response.status === 200) {
       waitUntil(cache.put(event.request, response.clone()));
     }
